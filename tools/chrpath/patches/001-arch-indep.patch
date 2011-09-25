@@ -1,0 +1,465 @@
+--- a/chrpath.c
++++ b/chrpath.c
+@@ -66,7 +66,7 @@ chrpath(const char *filename, const char
+   int i;
+   Elf_Phdr phdr;
+   Elf_Shdr shdr;
+-  Elf_Dyn *dyns;
++  void *dyns;
+   int rpathoff;
+   char * strtab;
+   char * rpath;
+@@ -92,15 +92,15 @@ chrpath(const char *filename, const char
+      return 1;
+    }
+ 
+-  dyns = malloc(phdr.p_filesz);
++  dyns = malloc(PHDR(p_filesz));
+   if (dyns == NULL)
+     {
+       perror ("allocating memory for dynamic section");
+       return 1;
+     }
+-  memset(dyns, 0, phdr.p_filesz);
+-  if (lseek(fd, phdr.p_offset, SEEK_SET) == -1
+-      || read(fd, dyns, phdr.p_filesz) != (int)phdr.p_filesz)
++  memset(dyns, 0, PHDR(p_filesz));
++  if (lseek(fd, PHDR(p_offset), SEEK_SET) == -1
++      || read(fd, dyns, PHDR(p_filesz)) != (int)PHDR(p_filesz))
+     {
+       perror ("reading dynamic section");
+       free(dyns);
+@@ -108,12 +108,12 @@ chrpath(const char *filename, const char
+     }
+ 
+   rpathoff = -1;
+-  for ( rpath_dyns_index = 0; dyns[rpath_dyns_index].d_tag != DT_NULL;
++  for ( rpath_dyns_index = 0; DYNS(rpath_dyns_index, d_tag) != DT_NULL;
+         ++rpath_dyns_index )
+     {
+-      if ( elf_dynpath_tag(dyns[rpath_dyns_index].d_tag) )
++      if ( elf_dynpath_tag(DYNS(rpath_dyns_index, d_tag)) )
+       {
+-         rpathoff = dyns[rpath_dyns_index].d_un.d_ptr;
++         rpathoff = DYNS(rpath_dyns_index, d_un.d_ptr);
+          break;
+       }
+     }
+@@ -124,47 +124,48 @@ chrpath(const char *filename, const char
+       return 2;
+     }
+ 
+-  if (lseek(fd, ehdr.e_shoff, SEEK_SET) == -1)
++  if (lseek(fd, EHDR(e_shoff), SEEK_SET) == -1)
+   {
+     perror ("positioning for sections");
+     free(dyns);
+     return 1;
+   }
+ 
+-  for (i = 0; i < ehdr.e_shnum; i++)
++  for (i = 0; i < EHDR(e_shnum); i++)
+   {
+-    if (read(fd, &shdr, sizeof(shdr)) != sizeof(shdr))
++    const size_t sz_shdr = is_e32() ? sizeof(Elf32_Shdr) : sizeof(Elf64_Shdr);
++    if (read(fd, &shdr, sz_shdr) != (ssize_t)sz_shdr)
+     {
+       perror ("reading section header");
+       free(dyns);
+       return 1;
+     }
+-    if (shdr.sh_type == SHT_STRTAB)
++    if (SHDR(sh_type) == SHT_STRTAB)
+       break;
+   }
+-  if (i == ehdr.e_shnum)
++  if (i == EHDR(e_shnum))
+     {
+       fprintf (stderr, "No string table found.\n");
+       free(dyns);
+       return 2;
+     }
+-  strtab = (char *)malloc(shdr.sh_size);
++  strtab = (char *)malloc(SHDR(sh_size));
+   if (strtab == NULL)
+     {
+       perror ("allocating memory for string table");
+       free(dyns);
+       return 1;
+     }
+-  memset(strtab, 0, shdr.sh_size);
++  memset(strtab, 0, SHDR(sh_size));
+ 
+-  if (lseek(fd, shdr.sh_offset, SEEK_SET) == -1)
++  if (lseek(fd, SHDR(sh_offset), SEEK_SET) == -1)
+   {
+     perror ("positioning for string table");
+     free(strtab);
+     free(dyns);
+     return 1;
+   }
+-  if (read(fd, strtab, shdr.sh_size) != (int)shdr.sh_size)
++  if (read(fd, strtab, SHDR(sh_size)) != (int)SHDR(sh_size))
+   {
+     perror ("reading string table");
+     free(strtab);
+@@ -172,10 +173,10 @@ chrpath(const char *filename, const char
+     return 1;
+   }
+ 
+-  if ((int)shdr.sh_size < rpathoff)
++  if ((int)SHDR(sh_size) < rpathoff)
+   {
+     fprintf(stderr, "%s string offset not contained in string table",
+-            elf_tagname(dyns[rpath_dyns_index].d_tag));
++            elf_tagname(DYNS(rpath_dyns_index, d_tag)));
+     free(strtab);
+     free(dyns);
+     return 5;
+@@ -183,11 +184,16 @@ chrpath(const char *filename, const char
+   rpath = strtab+rpathoff;
+ 
+ #if defined(DT_RUNPATH)
+-  if (convert && dyns[rpath_dyns_index].d_tag == DT_RPATH)
++  if (convert && DYNS(rpath_dyns_index, d_tag) == DT_RPATH)
+   {
+-    dyns[rpath_dyns_index].d_tag = DT_RUNPATH;
+-    if (lseek(fd, phdr.p_offset, SEEK_SET) == -1
+-        || write(fd, dyns, phdr.p_filesz) != (int)phdr.p_filesz)
++    if (is_e32())
++      ((Elf32_Dyn *)dyns)[rpath_dyns_index].d_tag = swap_bytes() ?
++        bswap_32(DT_RUNPATH) : DT_RUNPATH;
++    else
++      ((Elf64_Dyn *)dyns)[rpath_dyns_index].d_tag = swap_bytes() ?
++        bswap_64(DT_RUNPATH) : DT_RUNPATH;
++    if (lseek(fd, PHDR(p_offset), SEEK_SET) == -1
++        || write(fd, dyns, PHDR(p_filesz)) != (int)PHDR(p_filesz))
+     {
+       perror ("converting RPATH to RUNPATH");
+       return 1;
+@@ -196,7 +202,7 @@ chrpath(const char *filename, const char
+   }
+ #endif /* DT_RUNPATH */
+ 
+-  printf("%s: %s=%s\n", filename, elf_tagname(dyns[rpath_dyns_index].d_tag),
++  printf("%s: %s=%s\n", filename, elf_tagname(DYNS(rpath_dyns_index, d_tag)),
+          rpath);
+ 
+   if (NULL == newpath)
+@@ -212,7 +218,7 @@ chrpath(const char *filename, const char
+    * Calculate the maximum rpath length (will be equal to rpathlen unless
+    * we have previously truncated it).
+    */
+-  for ( i = rpathoff + rpathlen ; (i < (int)shdr.sh_size
++  for ( i = rpathoff + rpathlen ; (i < (int)SHDR(sh_size)
+                                    && strtab[i] == '\0') ; i++ )
+     ;
+   i--;
+@@ -232,7 +238,7 @@ chrpath(const char *filename, const char
+   memset(rpath, 0, rpathlen);
+   strcpy(rpath, newpath);
+ 
+-  if (lseek(fd, shdr.sh_offset+rpathoff, SEEK_SET) == -1)
++  if (lseek(fd, SHDR(sh_offset)+rpathoff, SEEK_SET) == -1)
+   {
+     perror ("positioning for RPATH");
+     free(dyns);
+@@ -247,7 +253,7 @@ chrpath(const char *filename, const char
+     return 1;
+   }
+   printf("%s: new %s: %s\n", filename,
+-         elf_tagname(dyns[rpath_dyns_index].d_tag), rpath);
++         elf_tagname(DYNS(rpath_dyns_index, d_tag)), rpath);
+ 
+   elf_close(fd);
+ 
+--- a/configure
++++ b/configure
+@@ -4032,8 +4032,6 @@ done
+ 
+ if eval "test x$GCC = xyes"; then
+   for flag in \
+-      -ansi \
+-      -pedantic \
+       -W \
+       -Wall \
+       -Wcast-align \
+--- a/configure.ac
++++ b/configure.ac
+@@ -33,8 +33,6 @@ AC_CHECK_FUNCS(getopt_long)
+ 
+ if eval "test x$GCC = xyes"; then
+   for flag in \
+-      -ansi \
+-      -pedantic \
+       -W \
+       -Wall \
+       -Wcast-align \
+--- a/elf.c
++++ b/elf.c
+@@ -16,10 +16,30 @@
+ #include <fcntl.h>
+ #include "protos.h"
+ 
++#define EHDR_P(x) (is_e32() ? DO_SWAP(ehdr->e32.x) : DO_SWAP(ehdr->e64.x))
++#define PHDR_P(x) (is_e32() ? DO_SWAP(phdr->e32.x) : DO_SWAP(phdr->e64.x))
++
++static int is_e32_flag;
++static int swap_bytes_flag;
++
++int
++is_e32(void)
++{
++  return is_e32_flag;
++}
++
++int
++swap_bytes(void)
++{
++  return swap_bytes_flag;
++}
++
+ int
+ elf_open(const char *filename, int flags, Elf_Ehdr *ehdr)
+ {
+    int fd;
++   size_t sz_ehdr;
++   size_t sz_phdr;
+ 
+    fd = open(filename, flags);
+    if (fd == -1)
+@@ -28,34 +48,43 @@ elf_open(const char *filename, int flags
+      return -1;
+    }
+ 
+-   if (read(fd, ehdr, sizeof(*ehdr)) != sizeof(*ehdr))
++   if (read(fd, ehdr, EI_NIDENT) != EI_NIDENT)
+    {
+-     perror ("reading header");
++     perror ("reading header (e_ident)");
+      close(fd);
+      return -1;
+    }
+ 
+    if (0 != memcmp(ehdr->e_ident, ELFMAG, SELFMAG) ||
+-       ehdr->e_ident[EI_CLASS] != ELFCLASS ||
+-       ehdr->e_ident[EI_DATA] != ELFDATA2 ||
++       (ehdr->e_ident[EI_CLASS] != ELFCLASS32 &&
++        ehdr->e_ident[EI_CLASS] != ELFCLASS64) ||
++       (ehdr->e_ident[EI_DATA] != ELFDATA2LSB &&
++        ehdr->e_ident[EI_DATA] != ELFDATA2MSB) ||
+        ehdr->e_ident[EI_VERSION] != EV_CURRENT)
+    {
+-     fprintf(stderr,
+-#ifdef WORDS_BIGENDIAN
+-             "`%s' probably isn't a %d-bit MSB-first ELF file.\n",
+-#else /* not WORD_BIGENDIAN */
+-             "`%s' probably isn't a %d-bit LSB-first ELF file.\n",
+-#endif /* not WORD_BIGENDIAN */
+-             filename, SIZEOF_VOID_P * 8);
++     fprintf(stderr, "`%s' probably isn't an ELF file.\n", filename);
+      close(fd);
+      errno = ENOEXEC; /* Hm, is this the best errno code to use? */
+      return -1;
+    }
+ 
+-   if (ehdr->e_phentsize != sizeof(Elf_Phdr))
++   is_e32_flag = ehdr->e_ident[EI_CLASS] == ELFCLASS32;
++   swap_bytes_flag = ehdr->e_ident[EI_DATA] != ELFDATA2;
++
++   sz_ehdr = is_e32() ? sizeof(Elf32_Ehdr) : sizeof(Elf64_Ehdr);
++   if (read(fd, ((char *)ehdr) + EI_NIDENT, sz_ehdr - EI_NIDENT)
++       != (ssize_t)(sz_ehdr - EI_NIDENT))
++   {
++     perror ("reading header");
++     close(fd);
++     return -1;
++   }
++
++   sz_phdr = is_e32() ? sizeof(Elf32_Phdr) : sizeof(Elf64_Phdr);
++   if (EHDR_P(e_phentsize) != sz_phdr)
+    {
+      fprintf(stderr, "section size was read as %d, not %d!\n",
+-            ehdr->e_phentsize, sizeof(Elf_Phdr));
++            EHDR_P(e_phentsize), (int)sz_phdr);
+      close(fd);
+      return -1;
+    }
+@@ -66,29 +95,30 @@ int
+ elf_find_dynamic_section(int fd, Elf_Ehdr *ehdr, Elf_Phdr *phdr)
+ {
+   int i;
+-  if (lseek(fd, ehdr->e_phoff, SEEK_SET) == -1)
++  if (lseek(fd, EHDR_P(e_phoff), SEEK_SET) == -1)
+   {
+     perror ("positioning for sections");
+     return 1;
+   }
+ 
+-  for (i = 0; i < ehdr->e_phnum; i++)
++  for (i = 0; i < EHDR_P(e_phnum); i++)
+   {
+-    if (read(fd, phdr, sizeof(*phdr)) != sizeof(*phdr))
++    const size_t sz_phdr = is_e32() ? sizeof(Elf32_Phdr) : sizeof(Elf64_Phdr);
++    if (read(fd, phdr, sz_phdr) != (ssize_t)sz_phdr)
+     {
+       perror ("reading section header");
+       return 1;
+     }
+-    if (phdr->p_type == PT_DYNAMIC)
++    if (PHDR_P(p_type) == PT_DYNAMIC)
+       break;
+   }
+-  if (i == ehdr->e_phnum)
++  if (i == EHDR_P(e_phnum))
+     {
+       fprintf (stderr, "No dynamic section found.\n");
+       return 2;
+     }
+ 
+-  if (0 == phdr->p_filesz)
++  if (0 == PHDR_P(p_filesz))
+     {
+       fprintf (stderr, "Length of dynamic section is zero.\n");
+       return 3;
+--- a/killrpath.c
++++ b/killrpath.c
+@@ -35,7 +35,7 @@ killrpath(const char *filename)
+    Elf_Ehdr ehdr;
+    int i;
+    Elf_Phdr phdr;
+-   Elf_Dyn *dyns;
++   void *dyns;
+    int dynpos;
+ 
+    fd = elf_open(filename, O_RDWR, &ehdr);
+@@ -52,32 +52,40 @@ killrpath(const char *filename)
+      return 1;
+    }
+ 
+-   dyns = malloc(phdr.p_memsz);
++   dyns = malloc(PHDR(p_memsz));
+    if (dyns == NULL)
+      {
+        perror ("allocating memory for dynamic section");
+        return 1;
+      }
+-   memset(dyns, 0, phdr.p_memsz);
+-   if (lseek(fd, phdr.p_offset, SEEK_SET) == -1
+-       || read(fd, dyns, phdr.p_filesz) != (int)phdr.p_filesz)
++   memset(dyns, 0, PHDR(p_memsz));
++   if (lseek(fd, PHDR(p_offset), SEEK_SET) == -1
++       || read(fd, dyns, PHDR(p_filesz)) != (int)PHDR(p_filesz))
+      {
+        perror ("reading dynamic section");
+        return 1;
+      }
+ 
+    dynpos = 0;
+-   for (i = 0; dyns[i].d_tag != DT_NULL; i++)
++   for (i = 0; DYNS(i, d_tag) != DT_NULL; i++)
+      {
+-       dyns[dynpos] = dyns[i];
+-       if ( ! elf_dynpath_tag(dyns[i].d_tag) )
++       if (is_e32())
++        ((Elf32_Dyn *)dyns)[dynpos] = ((Elf32_Dyn *)dyns)[i];
++       else
++        ((Elf64_Dyn *)dyns)[dynpos] = ((Elf64_Dyn *)dyns)[i];
++       if ( ! elf_dynpath_tag(DYNS(i, d_tag)) )
+         dynpos++;
+      }
+    for (; dynpos < i; dynpos++)
+-     dyns[dynpos].d_tag = DT_NULL;
++     {
++       if (is_e32())
++        ((Elf32_Dyn *)dyns)[dynpos].d_tag = DT_NULL;
++       else
++        ((Elf64_Dyn *)dyns)[dynpos].d_tag = DT_NULL;
++     }
+ 
+-   if (lseek(fd, phdr.p_offset, SEEK_SET) == -1
+-       || write(fd, dyns, phdr.p_filesz) != (int)phdr.p_filesz)
++   if (lseek(fd, PHDR(p_offset), SEEK_SET) == -1
++       || write(fd, dyns, PHDR(p_filesz)) != (int)PHDR(p_filesz))
+      {
+        perror ("writing dynamic section");
+        return 1;
+--- a/main.c
++++ b/main.c
+@@ -31,7 +31,8 @@ static struct option long_options[] =
+   {"keepgoing", 0, 0, 'k'},
+   {"list",      0, 0, 'l'},
+   {"replace",   1, 0, 'r'},
+-  {"version",   0, 0, 'v'}
++  {"version",   0, 0, 'v'},
++  {0, 0, 0, 0}
+ };
+ 
+ #else /* not HAVE_GETOPT_LONG */
+--- a/protos.h
++++ b/protos.h
+@@ -1,6 +1,7 @@
+ #ifndef PROTOS_H
+ #define PROTOS_H
+ 
++#include <byteswap.h>
+ #include <elf.h>
+ #include "config.h"
+ 
+@@ -9,22 +10,43 @@
+ #else
+ #define ELFDATA2 ELFDATA2LSB
+ #endif
+-#if SIZEOF_VOID_P == 8
+-#define Elf_Ehdr Elf64_Ehdr
+-#define ELFCLASS ELFCLASS64
+-#define Elf_Phdr Elf64_Phdr
+-#define Elf_Shdr Elf64_Shdr
+-#define Elf_Dyn  Elf64_Dyn
+-#elif SIZEOF_VOID_P == 4
+-#define Elf_Ehdr Elf32_Ehdr
+-#define ELFCLASS ELFCLASS32
+-#define Elf_Phdr Elf32_Phdr
+-#define Elf_Shdr Elf32_Shdr
+-#define Elf_Dyn  Elf32_Dyn
+-#else
++#if SIZEOF_VOID_P != 8 && SIZEOF_VOID_P != 4
+ #error "Unknown word size (SIZEOF_VOID_P)!"
+ #endif
+ 
++typedef union {
++  unsigned char e_ident[EI_NIDENT];
++  Elf32_Ehdr e32;
++  Elf64_Ehdr e64;
++} Elf_Ehdr;
++
++typedef union {
++  Elf32_Shdr e32;
++  Elf64_Shdr e64;
++} Elf_Shdr;
++
++typedef union {
++  Elf32_Phdr e32;
++  Elf64_Phdr e64;
++} Elf_Phdr;
++
++int is_e32(void);
++int swap_bytes(void);
++
++#define DO_SWAP(x) ( \
++  !swap_bytes() ? x \
++  : sizeof(x) == 2 ? (typeof(x))bswap_16(x) \
++  : sizeof(x) == 4 ? (typeof(x))bswap_32(x) \
++  : sizeof(x) == 8 ? (typeof(x))bswap_64(x) \
++  : x \
++)
++
++#define EHDR(x) (is_e32() ? DO_SWAP(ehdr.e32.x) : DO_SWAP(ehdr.e64.x))
++#define PHDR(x) (is_e32() ? DO_SWAP(phdr.e32.x) : DO_SWAP(phdr.e64.x))
++#define SHDR(x) (is_e32() ? DO_SWAP(shdr.e32.x) : DO_SWAP(shdr.e64.x))
++#define DYNS(i,x) (is_e32() ? DO_SWAP(((Elf32_Dyn *)dyns)[i].x) \
++  : DO_SWAP(((Elf64_Dyn *)dyns)[i].x))
++
+ int killrpath(const char *filename);
+ int chrpath(const char *filename, const char *newpath, int convert);
+ 

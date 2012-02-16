@@ -195,7 +195,7 @@ define Image/Build/WHRHPG300N
 endef
 
 define Image/Build/Cameo
-	$(call MkuImageLzma,$(2),$(3) $($(4)))
+	$(call MkuImageLzma,$(2),$(3) $(4))
 	$(call Sysupgrade/KRuImage,$(1),$(2),$(5),$(6))
 	if [ -e "$(call sysupname,$(1),$(2))" ]; then \
 		( \
@@ -206,14 +206,14 @@ define Image/Build/Cameo
 	fi
 endef
 
-cameo913x_mtdlayout=mtdparts=spi0.0:128k(u-boot)ro,64k(config)ro,896k(kernel),2944k(rootfs),64k(art)ro,3840k@0x30000(firmware)
+cameo913x_mtdlayout=mtdparts=spi0.0:128k(u-boot)ro,64k(config)ro,960k(kernel),2880k(rootfs),64k(art)ro,3840k@0x30000(firmware)
 define Image/Build/Cameo913x
-	$(call Image/Build/Cameo,$(1),$(2),$(3),$(cameo913x_mtdlayout),917504,2949120,$(4))
+	$(call Image/Build/Cameo,$(1),$(2),$(3),$(cameo913x_mtdlayout),983040,2949120,$(4))
 endef
 
-cameo7240_mtdlayout=mtdparts=spi0.0:192k(u-boot)ro,64k(nvram)ro,896k(kernel),2816k(rootfs),64k(mac)ro,64k(art)ro,3712k@0x40000(firmware)
+cameo7240_mtdlayout=mtdparts=spi0.0:192k(u-boot)ro,64k(nvram)ro,960k(kernel),2752k(rootfs),64k(mac)ro,64k(art)ro,3712k@0x40000(firmware)
 define Image/Build/Cameo7240
-	$(call Image/Build/Cameo,$(1),$(2),$(3),$(cameo7240_mtdlayout),917504,2818048,$(4))
+	$(call Image/Build/Cameo,$(1),$(2),$(3),$(cameo7240_mtdlayout),983040,2818048,$(4))
 endef
 
 define Image/Build/Ath
@@ -698,6 +698,11 @@ define Image/Build/Profile/DIR600A1
 	$(call Image/Build/Template/$(fs_64k)/$(1),Cameo7240,dir-600-a1,$(dir600a1_cmdline),"AP91-AR7240-RT-090223-00")
 endef
 
+dir601a1_cmdline=board=DIR-600-A1 console=ttyS0,115200
+define Image/Build/Profile/DIR601A1
+	$(call Image/Build/Template/$(fs_64k)/$(1),Cameo7240,dir-601-a1,$(dir600a1_cmdline),"AP91-AR7240-RT-090223-02")
+endef
+
 dir615e4_cmdline=board=DIR-615-E4 console=ttyS0,115200
 define Image/Build/Profile/DIR615E4
 	$(call Image/Build/Template/$(fs_64k)/$(1),Cameo7240,dir-615-e4,$(dir615e4_cmdline),"AP99-AR7240-RT-091105-05")
@@ -1009,6 +1014,7 @@ define Image/Build/Profile/Default
 	$(call Image/Build/Profile/A02RBW300N,$(1))
 	$(call Image/Build/Profile/DB120,$(1))
 	$(call Image/Build/Profile/DIR600A1,$(1))
+	$(call Image/Build/Profile/DIR601A1,$(1))
 	$(call Image/Build/Profile/DIR615C1,$(1))
 	$(call Image/Build/Profile/DIR615E4,$(1))
 	$(call Image/Build/Profile/DIR825B1,$(1))

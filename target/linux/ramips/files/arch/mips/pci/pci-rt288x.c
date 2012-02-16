@@ -126,14 +126,14 @@ static struct pci_ops rt2880_pci_ops = {
 	.write	= rt2880_pci_config_write,
 };
 
-static struct resource rt2880_pci_io_resource = {
+static struct resource rt2880_pci_mem_resource = {
 	.name	= "PCI MEM space",
 	.start	= RT2880_PCI_MEM_BASE,
 	.end	= RT2880_PCI_MEM_BASE + RT2880_PCI_MEM_SIZE - 1,
 	.flags	= IORESOURCE_MEM,
 };
 
-static struct resource rt2880_pci_mem_resource = {
+static struct resource rt2880_pci_io_resource = {
 	.name	= "PCI IO space",
 	.start	= RT2880_PCI_IO_BASE,
 	.end	= RT2880_PCI_IO_BASE + RT2880_PCI_IO_SIZE - 1,
@@ -142,8 +142,8 @@ static struct resource rt2880_pci_mem_resource = {
 
 static struct pci_controller rt2880_pci_controller = {
 	.pci_ops	= &rt2880_pci_ops,
-	.mem_resource	= &rt2880_pci_io_resource,
-	.io_resource	= &rt2880_pci_mem_resource,
+	.mem_resource	= &rt2880_pci_mem_resource,
+	.io_resource	= &rt2880_pci_io_resource,
 };
 
 static inline u32 rt2880_pci_read_u32(unsigned long reg)
@@ -212,9 +212,17 @@ int __init pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
 
 static int __init rt2880_pci_init(void)
 {
+	void __iomem *io_map_base;
 	int i;
 
 	rt2880_pci_base = ioremap_nocache(RT2880_PCI_BASE, PAGE_SIZE);
+
+	io_map_base = ioremap(RT2880_PCI_IO_BASE, RT2880_PCI_IO_SIZE);
+	rt2880_pci_controller.io_map_base = (unsigned long) io_map_base;
+	set_io_port_base((unsigned long) io_map_base);
+
+	ioport_resource.start = RT2880_PCI_IO_BASE;
+	ioport_resource.end = RT2880_PCI_IO_BASE + RT2880_PCI_IO_SIZE - 1;
 
 	rt2880_pci_reg_write(0, RT2880_PCI_REG_PCICFG_ADDR);
 	for(i = 0; i < 0xfffff; i++) {}

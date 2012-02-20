@@ -144,16 +144,16 @@ define Image/Build/Template/GENERIC_4M
 	$(call BuildFirmware/Generic,$(1),$(2),board=$(3),mtdlayout_4M,851968,3014656)
 endef
 
-mtdlayout_8M=mtdparts=physmap-flash.0:192k(u-boot)ro,64k(u-boot-env)ro,64k(factory)ro,832k(kernel),7040k(rootfs),7872k@0x50000(firmware)
-kernel_size_8M=851968
-rootfs_size_8M=7208960
+mtdlayout_8M=mtdparts=physmap-flash.0:192k(u-boot)ro,64k(u-boot-env)ro,64k(factory)ro,896k(kernel),6976k(rootfs),7872k@0x50000(firmware)
+kernel_size_8M=917504
+rootfs_size_8M=7143424
 define Image/Build/Template/GENERIC_8M
 	$(call BuildFirmware/Generic,$(1),$(2),board=$(3),mtdlayout_8M,$(kernel_size_8M),$(rootfs_size_8M))
 endef
 
-mtdlayout_dir300b1=mtdparts=physmap-flash.0:192k(u-boot)ro,64k(devdata)ro,64k(devconf)ro,832k(kernel),2944k(rootfs),3776k@0x50000(firmware)
-mtd_dir300b1_kernel_part_size=851968
-mtd_dir300b1_rootfs_part_size=3014656
+mtdlayout_dir300b1=mtdparts=physmap-flash.0:192k(u-boot)ro,64k(devdata)ro,64k(devconf)ro,896k(kernel),2880k(rootfs),3776k@0x50000(firmware)
+mtd_dir300b1_kernel_part_size=917504
+mtd_dir300b1_rootfs_part_size=2949120
 define Image/Build/Template/DIR300B1
 	$(call BuildFirmware/Generic,$(1),$(2),board=$(3),mtdlayout_dir300b1,$(mtd_dir300b1_kernel_part_size),$(mtd_dir300b1_rootfs_part_size))
 	mkwrgimg -s $(4) -d /dev/mtdblock/2 \
@@ -313,6 +313,10 @@ define Image/Build/Profile/WR5123GN
 	$(call Image/Build/Template/GENERIC_8M,$(1),wr512-3gn-8M,WR512-3GN)
 endef
 
+define Image/Build/Profile/SLR7205
+	$(call Image/Build/Template/GENERIC_4M,$(1),sl-r7205,SL-R7205)
+endef
+
 ifeq ($(CONFIG_RALINK_RT305X),y)
 define Image/Build/Profile/Default
 	$(call Image/Build/Profile/ARGUS_ATP52B,$(1))
@@ -327,6 +331,7 @@ define Image/Build/Profile/Default
 	$(call Image/Build/Profile/NW718,$(1))
 	$(call Image/Build/Profile/OMNIEMB,$(1))
 	$(call Image/Build/Profile/PWH2004,$(1))
+	$(call Image/Build/Profile/SLR7205,$(1))
 	$(call Image/Build/Profile/WHRG300N,$(1))
 	$(call Image/Build/Profile/WCR150GN,$(1))
 	$(call Image/Build/Profile/F5D8235V2,$(1))
@@ -348,6 +353,11 @@ define Image/Build/Profile/RTN15
 	$(call Image/Build/Template/GENERIC_4M,$(1),rt-n15,RT-N15)
 endef
 
+mtdlayout_v11stfe=mtdparts=physmap-flash.0:192k(u-boot)ro,64k(u-boot-env)ro,64k(factory)ro,1280k(kernel),2112k(rootfs),3392k@0x50000(firmware)
+define Image/Build/Profile/V11STFE
+	$(call BuildFirmware/Generic,$(1),v11st-fe,board=V11ST-FE,mtdlayout_v11stfe,1310720,2162688)
+endef
+
 mtdlayout_wlitx4ag300n=mtdparts=physmap-flash.0:192k(u-boot)ro,64k(u-boot-env)ro,64k(factory)ro,832k(kernel),2880k(rootfs),64k(user)ro,3712k@0x50000(firmware)
 define Image/Build/Profile/WLITX4AG300N
 	$(call BuildFirmware/Buffalo2,$(1),wli-tx4-ag300n,WLI-TX4-AG300N,mtdlayout_wlitx4ag300n,851968,2949120)
@@ -357,6 +367,7 @@ ifeq ($(CONFIG_RALINK_RT288X),y)
 define Image/Build/Profile/Default
 	$(call Image/Build/Profile/F5D8235V1,$(1))
 	$(call Image/Build/Profile/RTN15,$(1))
+	$(call Image/Build/Profile/V11STFE,$(1))
 	$(call Image/Build/Profile/WLITX4AG300N,$(1))
 endef
 endif

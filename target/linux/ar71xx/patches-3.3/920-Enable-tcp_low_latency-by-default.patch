@@ -1,0 +1,25 @@
+From 21be0184bf1c2e1e4a2dd913d1bf3b35c6142211 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Dave=20T=C3=A4ht?= <d+bufferbloat@taht.net>
+Date: Thu, 11 Aug 2011 00:05:25 -0700
+Subject: [PATCH] Enable tcp_low_latency by default
+
+---
+ net/ipv4/tcp_ipv4.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/net/ipv4/tcp_ipv4.c b/net/ipv4/tcp_ipv4.c
+index 1c12b8e..ef2f047 100644
+--- a/net/ipv4/tcp_ipv4.c
++++ b/net/ipv4/tcp_ipv4.c
+@@ -84,7 +84,7 @@
+ #include <linux/scatterlist.h>
+ 
+ int sysctl_tcp_tw_reuse __read_mostly;
+-int sysctl_tcp_low_latency __read_mostly;
++int sysctl_tcp_low_latency __read_mostly = 1;
+ EXPORT_SYMBOL(sysctl_tcp_low_latency);
+ 
+ 
+-- 
+1.7.4.1
+

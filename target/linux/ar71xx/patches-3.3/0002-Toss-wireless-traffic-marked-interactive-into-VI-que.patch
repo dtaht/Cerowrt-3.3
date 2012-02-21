@@ -1,0 +1,33 @@
+From a18428b22e5562e2c7fdc91e563c76017caf764d Mon Sep 17 00:00:00 2001
+From: Dave Taht <dave.taht@bufferbloat.net>
+Date: Tue, 20 Dec 2011 09:04:10 +0100
+Subject: [PATCH 2/2] Toss wireless traffic marked interactive into VI queue
+
+While the current dscp classifier in the wireless portion of the
+stack mostly does the 'right thing' with diffserv traffic, it
+does not account for the legacy TOS use of the immediate bit,
+which is commonly used by interactive applications such as ssh.
+
+This pushes traffic marked with that bit into the VI queue,
+which has properties most compatable with the 'Immmediate' concept.
+---
+ net/wireless/util.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/net/wireless/util.c b/net/wireless/util.c
+index 33d8e10..ce20c3c 100644
+--- a/net/wireless/util.c
++++ b/net/wireless/util.c
+@@ -672,6 +672,9 @@ unsigned int cfg80211_classify8021d(struct sk_buff *skb)
+ 		return 0;
+ 	}
+ 
++	if(dscp == 16) /* Toss traffic with immediate bit set into VI */
++		return(5);
++
+ 	return dscp >> 5;
+ }
+ EXPORT_SYMBOL(cfg80211_classify8021d);
+-- 
+1.7.5.4
+

@@ -333,7 +333,7 @@ void madwifi_close(void)
 	/* Nop */
 }
 
-int madwifi_get_mode(const char *ifname, char *buf)
+int madwifi_get_mode(const char *ifname, int *buf)
 {
 	return wext_get_mode(ifname, buf);
 }
@@ -726,9 +726,29 @@ int madwifi_get_assoclist(const char *ifname, char *buf, int *len)
 		do {
 			si = (struct ieee80211req_sta_info *) cp;
 
+			memset(&entry, 0, sizeof(entry));
+
 			entry.signal = (si->isi_rssi - 95);
 			entry.noise  = noise;
 			memcpy(entry.mac, &si->isi_macaddr, 6);
+
+			entry.inactive = si->isi_inact * 1000;
+
+			entry.tx_packets = (si->isi_txseqs[0] & IEEE80211_SEQ_SEQ_MASK)
+				>> IEEE80211_SEQ_SEQ_SHIFT;
+
+			entry.rx_packets = (si->isi_rxseqs[0] & IEEE80211_SEQ_SEQ_MASK)
+				>> IEEE80211_SEQ_SEQ_SHIFT;
+
+			entry.tx_rate.rate =
+				(si->isi_rates[si->isi_txrate] & IEEE80211_RATE_VAL) * 500;
+
+			/* XXX: this is just a guess */
+			entry.rx_rate.rate = entry.tx_rate.rate;
+
+			entry.rx_rate.mcs = -1;
+			entry.tx_rate.mcs = -1;
+
 			memcpy(&buf[bl], &entry, sizeof(struct iwinfo_assoclist_entry));
 
 			bl += sizeof(struct iwinfo_assoclist_entry);

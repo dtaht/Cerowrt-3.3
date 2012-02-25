@@ -213,6 +213,32 @@ struct ramips_tx_dma {
 	unsigned int txd4;
 } __packed __aligned(4);
 
+struct raeth_int_stats {
+	unsigned long		rx_delayed;
+	unsigned long		tx_delayed;
+	unsigned long		rx_done0;
+	unsigned long		tx_done0;
+	unsigned long		tx_done1;
+	unsigned long		tx_done2;
+	unsigned long		tx_done3;
+	unsigned long		rx_coherent;
+	unsigned long		tx_coherent;
+
+	unsigned long		pse_fq_empty;
+	unsigned long		pse_p0_fc;
+	unsigned long		pse_p1_fc;
+	unsigned long		pse_p2_fc;
+	unsigned long		pse_buf_drop;
+
+	unsigned long		total;
+};
+
+struct raeth_debug {
+	struct dentry		*debugfs_dir;
+
+	struct raeth_int_stats	int_stats;
+};
+
 struct raeth_priv
 {
 	dma_addr_t		rx_desc_dma;
@@ -243,6 +269,25 @@ struct raeth_priv
 	int			mii_irq[PHY_MAX_ADDR];
 	struct phy_device	*phy_dev;
 	spinlock_t		phy_lock;
+
+#ifdef CONFIG_NET_RAMIPS_DEBUG_FS
+	struct raeth_debug	debug;
+#endif
 };
+
+#ifdef CONFIG_NET_RAMIPS_DEBUG_FS
+int raeth_debugfs_root_init(void);
+void raeth_debugfs_root_exit(void);
+int raeth_debugfs_init(struct raeth_priv *re);
+void raeth_debugfs_exit(struct raeth_priv *re);
+void raeth_debugfs_update_int_stats(struct raeth_priv *re, u32 status);
+#else
+static inline int raeth_debugfs_root_init(void) { return 0; }
+static inline void raeth_debugfs_root_exit(void) {}
+static inline int raeth_debugfs_init(struct raeth_priv *re) { return 0; }
+static inline void raeth_debugfs_exit(struct raeth_priv *re) {}
+static inline void raeth_debugfs_update_int_stats(struct raeth_priv *re,
+						  u32 status) {}
+#endif /* CONFIG_NET_RAMIPS_DEBUG_FS */
 
 #endif /* RAMIPS_ETH_H */

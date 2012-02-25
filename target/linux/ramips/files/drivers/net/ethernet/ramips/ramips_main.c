@@ -755,19 +755,27 @@ static irqreturn_t
 ramips_eth_irq(int irq, void *dev)
 {
 	struct raeth_priv *re = netdev_priv(dev);
-	unsigned long fe_int = ramips_fe_rr(RAMIPS_FE_INT_STATUS);
+	unsigned int status;
 
-	ramips_fe_wr(0xFFFFFFFF, RAMIPS_FE_INT_STATUS);
+	status = ramips_fe_rr(RAMIPS_FE_INT_STATUS);
+	status &= ramips_fe_rr(RAMIPS_FE_INT_ENABLE);
 
-	if (fe_int & RAMIPS_RX_DLY_INT) {
+	if (!status)
+		return IRQ_NONE;
+
+	ramips_fe_wr(status, RAMIPS_FE_INT_STATUS);
+
+	if (status & RAMIPS_RX_DLY_INT) {
 		ramips_fe_int_disable(RAMIPS_RX_DLY_INT);
 		tasklet_schedule(&re->rx_tasklet);
 	}
 
-	if (fe_int & RAMIPS_TX_DLY_INT) {
+	if (status & RAMIPS_TX_DLY_INT) {
 		ramips_fe_int_disable(RAMIPS_TX_DLY_INT);
 		tasklet_schedule(&re->tx_housekeeping_tasklet);
 	}
+
+	raeth_debugfs_update_int_stats(re, status);
 
 	return IRQ_HANDLED;
 }
@@ -874,8 +882,14 @@ ramips_eth_probe(struct net_device *dev)
 	if (err)
 		goto err_mdio_cleanup;
 
+	err = raeth_debugfs_init(re);
+	if (err)
+		goto err_phy_disconnect;
+
 	return 0;
 
+err_phy_disconnect:
+	ramips_phy_disconnect(re);
 err_mdio_cleanup:
 	ramips_mdio_cleanup(re);
 	return err;
@@ -886,6 +900,7 @@ ramips_eth_uninit(struct net_device *dev)
 {
 	struct raeth_priv *re = netdev_priv(dev);
 
+	raeth_debugfs_exit(re);
 	ramips_phy_disconnect(re);
 	ramips_mdio_cleanup(re);
 }
@@ -992,9 +1007,13 @@ ramips_eth_init(void)
 {
 	int ret;
 
+	ret = raeth_debugfs_root_init();
+	if (ret)
+		goto err_out;
+
 	ret = rt305x_esw_init();
 	if (ret)
-		return ret;
+		goto err_debugfs_exit;
 
 	ret = platform_driver_register(&ramips_eth_driver);
 	if (ret) {
@@ -1007,6 +1026,9 @@ ramips_eth_init(void)
 
 esw_cleanup:
 	rt305x_esw_exit();
+err_debugfs_exit:
+	raeth_debugfs_root_exit();
+err_out:
 	return ret;
 }
 
@@ -1015,6 +1037,7 @@ ramips_eth_cleanup(void)
 {
 	platform_driver_unregister(&ramips_eth_driver);
 	rt305x_esw_exit();
+	raeth_debugfs_root_exit();
 }
 
 module_init(ramips_eth_init);

@@ -108,20 +108,25 @@ ramips_ring_setup(struct raeth_priv *re)
 	int len;
 	int i;
 
+	memset(re->tx_info, 0, NUM_TX_DESC * sizeof(struct raeth_tx_info));
+
 	len = NUM_TX_DESC * sizeof(struct ramips_tx_dma);
 	memset(re->tx, 0, len);
 
 	for (i = 0; i < NUM_TX_DESC; i++) {
+		struct raeth_tx_info *txi;
 		struct ramips_tx_dma *txd;
 
 		txd = &re->tx[i];
 		txd->txd4 = TX_DMA_QN(3) | TX_DMA_PN(1);
 		txd->txd2 = TX_DMA_LSO | TX_DMA_DONE;
 
-		if (re->tx_skb[i] != NULL) {
+		txi = &re->tx_info[i];
+		txi->tx_desc = txd;
+		if (txi->tx_skb != NULL) {
 			netdev_warn(re->netdev,
 				    "dirty skb for TX desc %d\n", i);
-			re->tx_skb[i] = NULL;
+			txi->tx_skb = NULL;
 		}
 	}
 
@@ -129,14 +134,20 @@ ramips_ring_setup(struct raeth_priv *re)
 	memset(re->rx, 0, len);
 
 	for (i = 0; i < NUM_RX_DESC; i++) {
+		struct raeth_rx_info *rxi;
+		struct ramips_rx_dma *rxd;
 		dma_addr_t dma_addr;
 
-		BUG_ON(re->rx_skb[i] == NULL);
-		dma_addr = dma_map_single(&re->netdev->dev, re->rx_skb[i]->data,
+		rxd = &re->rx[i];
+		rxi = &re->rx_info[i];
+		BUG_ON(rxi->rx_skb == NULL);
+		dma_addr = dma_map_single(&re->netdev->dev, rxi->rx_skb->data,
 					  MAX_RX_LENGTH, DMA_FROM_DEVICE);
-		re->rx_dma[i] = dma_addr;
-		re->rx[i].rxd1 = (unsigned int) dma_addr;
-		re->rx[i].rxd2 = RX_DMA_LSO;
+		rxi->rx_dma = dma_addr;
+		rxi->rx_desc = rxd;
+
+		rxd->rxd1 = (unsigned int) dma_addr;
+		rxd->rxd2 = RX_DMA_LSO;
 	}
 
 	/* flush descriptors */
@@ -148,16 +159,24 @@ ramips_ring_cleanup(struct raeth_priv *re)
 {
 	int i;
 
-	for (i = 0; i < NUM_RX_DESC; i++)
-		if (re->rx_skb[i])
-			dma_unmap_single(&re->netdev->dev, re->rx_dma[i],
-					 MAX_RX_LENGTH, DMA_FROM_DEVICE);
+	for (i = 0; i < NUM_RX_DESC; i++) {
+		struct raeth_rx_info *rxi;
 
-	for (i = 0; i < NUM_TX_DESC; i++)
-		if (re->tx_skb[i]) {
-			dev_kfree_skb_any(re->tx_skb[i]);
-			re->tx_skb[i] = NULL;
+		rxi = &re->rx_info[i];
+		if (rxi->rx_skb)
+			dma_unmap_single(&re->netdev->dev, rxi->rx_dma,
+					 MAX_RX_LENGTH, DMA_FROM_DEVICE);
+	}
+
+	for (i = 0; i < NUM_TX_DESC; i++) {
+		struct raeth_tx_info *txi;
+
+		txi = &re->tx_info[i];
+		if (txi->tx_skb) {
+			dev_kfree_skb_any(txi->tx_skb);
+			txi->tx_skb = NULL;
 		}
+	}
 }
 
 #if defined(CONFIG_RALINK_RT288X) || defined(CONFIG_RALINK_RT3883)
@@ -544,9 +563,16 @@ ramips_ring_free(struct raeth_priv *re)
 	int len;
 	int i;
 
-	for (i = 0; i < NUM_RX_DESC; i++)
-		if (re->rx_skb[i])
-			dev_kfree_skb_any(re->rx_skb[i]);
+	if (re->rx_info) {
+		for (i = 0; i < NUM_RX_DESC; i++) {
+			struct raeth_rx_info *rxi;
+
+			rxi = &re->rx_info[i];
+			if (rxi->rx_skb)
+				dev_kfree_skb_any(rxi->rx_skb);
+		}
+		kfree(re->rx_info);
+	}
 
 	if (re->rx) {
 		len = NUM_RX_DESC * sizeof(struct ramips_rx_dma);
@@ -559,6 +585,8 @@ ramips_ring_free(struct raeth_priv *re)
 		dma_free_coherent(&re->netdev->dev, len, re->tx,
 				  re->tx_desc_dma);
 	}
+
+	kfree(re->tx_info);
 }
 
 static int
@@ -567,6 +595,16 @@ ramips_ring_alloc(struct raeth_priv *re)
 	int len;
 	int err = -ENOMEM;
 	int i;
+
+	re->tx_info = kzalloc(NUM_TX_DESC * sizeof(struct raeth_tx_info),
+			      GFP_ATOMIC);
+	if (!re->tx_info)
+		goto err_cleanup;
+
+	re->rx_info = kzalloc(NUM_RX_DESC * sizeof(struct raeth_rx_info),
+			      GFP_ATOMIC);
+	if (!re->rx_info)
+		goto err_cleanup;
 
 	/* allocate tx ring */
 	len = NUM_TX_DESC * sizeof(struct ramips_tx_dma);
@@ -589,7 +627,7 @@ ramips_ring_alloc(struct raeth_priv *re)
 		if (!skb)
 			goto err_cleanup;
 
-		re->rx_skb[i] = skb;
+		re->rx_info[i].rx_skb = skb;
 	}
 
 	return 0;
@@ -617,6 +655,8 @@ static int
 ramips_eth_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct raeth_priv *re = netdev_priv(dev);
+	struct raeth_tx_info *txi, *txi_next;
+	struct ramips_tx_dma *txd, *txd_next;
 	unsigned long tx;
 	unsigned int tx_next;
 	dma_addr_t mapped_addr;
@@ -641,18 +681,23 @@ ramips_eth_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	tx = ramips_fe_rr(RAMIPS_TX_CTX_IDX0);
 	tx_next = (tx + 1) % NUM_TX_DESC;
 
-	if ((re->tx_skb[tx]) || (re->tx_skb[tx_next]) ||
-	    !(re->tx[tx].txd2 & TX_DMA_DONE) ||
-	    !(re->tx[tx_next].txd2 & TX_DMA_DONE))
+	txi = &re->tx_info[tx];
+	txd = txi->tx_desc;
+	txi_next = &re->tx_info[tx_next];
+	txd_next = txi_next->tx_desc;
+
+	if ((txi->tx_skb) || (txi_next->tx_skb) ||
+	    !(txd->txd2 & TX_DMA_DONE) ||
+	    !(txd_next->txd2 & TX_DMA_DONE))
 		goto out;
 
-	re->tx[tx].txd1 = (unsigned int) mapped_addr;
-	re->tx[tx].txd2 &= ~(TX_DMA_PLEN0_MASK | TX_DMA_DONE);
-	re->tx[tx].txd2 |= TX_DMA_PLEN0(skb->len);
+	txi->tx_skb = skb;
+
+	txd->txd1 = (unsigned int) mapped_addr;
+	wmb();
+	txd->txd2 = TX_DMA_LSO | TX_DMA_PLEN0(skb->len);
 	dev->stats.tx_packets++;
 	dev->stats.tx_bytes += skb->len;
-	re->tx_skb[tx] = skb;
-	wmb();
 	ramips_fe_wr(tx_next, RAMIPS_TX_CTX_IDX0);
 	spin_unlock(&re->page_lock);
 	return NETDEV_TX_OK;
@@ -672,24 +717,30 @@ ramips_eth_rx_hw(unsigned long ptr)
 	int rx;
 	int max_rx = 16;
 
+	rx = ramips_fe_rr(RAMIPS_RX_CALC_IDX0);
+
 	while (max_rx) {
+		struct raeth_rx_info *rxi;
+		struct ramips_rx_dma *rxd;
 		struct sk_buff *rx_skb, *new_skb;
 		int pktlen;
 
-		rx = (ramips_fe_rr(RAMIPS_RX_CALC_IDX0) + 1) % NUM_RX_DESC;
-		if (!(re->rx[rx].rxd2 & RX_DMA_DONE))
-			break;
-		max_rx--;
+		rx = (rx + 1) % NUM_RX_DESC;
 
-		rx_skb = re->rx_skb[rx];
-		pktlen = RX_DMA_PLEN0(re->rx[rx].rxd2);
+		rxi = &re->rx_info[rx];
+		rxd = rxi->rx_desc;
+		if (!(rxd->rxd2 & RX_DMA_DONE))
+			break;
+
+		rx_skb = rxi->rx_skb;
+		pktlen = RX_DMA_PLEN0(rxd->rxd2);
 
 		new_skb = ramips_alloc_skb(re);
 		/* Reuse the buffer on allocation failures */
 		if (new_skb) {
 			dma_addr_t dma_addr;
 
-			dma_unmap_single(&re->netdev->dev, re->rx_dma[rx],
+			dma_unmap_single(&re->netdev->dev, rxi->rx_dma,
 					 MAX_RX_LENGTH, DMA_FROM_DEVICE);
 
 			skb_put(rx_skb, pktlen);
@@ -700,21 +751,22 @@ ramips_eth_rx_hw(unsigned long ptr)
 			dev->stats.rx_bytes += pktlen;
 			netif_rx(rx_skb);
 
-			re->rx_skb[rx] = new_skb;
+			rxi->rx_skb = new_skb;
 
 			dma_addr = dma_map_single(&re->netdev->dev,
 						  new_skb->data,
 						  MAX_RX_LENGTH,
 						  DMA_FROM_DEVICE);
-			re->rx_dma[rx] = dma_addr;
-			re->rx[rx].rxd1 = (unsigned int) dma_addr;
+			rxi->rx_dma = dma_addr;
+			rxd->rxd1 = (unsigned int) dma_addr;
+			wmb();
 		} else {
 			dev->stats.rx_dropped++;
 		}
 
-		re->rx[rx].rxd2 &= ~RX_DMA_DONE;
-		wmb();
+		rxd->rxd2 = RX_DMA_LSO;
 		ramips_fe_wr(rx, RAMIPS_RX_CALC_IDX0);
+		max_rx--;
 	}
 
 	if (max_rx == 0)
@@ -730,10 +782,18 @@ ramips_eth_tx_housekeeping(unsigned long ptr)
 	struct raeth_priv *re = netdev_priv(dev);
 
 	spin_lock(&re->page_lock);
-	while ((re->tx[re->skb_free_idx].txd2 & TX_DMA_DONE) &&
-	       (re->tx_skb[re->skb_free_idx])) {
-		dev_kfree_skb_irq(re->tx_skb[re->skb_free_idx]);
-		re->tx_skb[re->skb_free_idx] = 0;
+	while (1) {
+		struct raeth_tx_info *txi;
+		struct ramips_tx_dma *txd;
+
+		txi = &re->tx_info[re->skb_free_idx];
+		txd = txi->tx_desc;
+
+		if (!(txd->txd2 & TX_DMA_DONE) || !(txi->tx_skb))
+			break;
+
+		dev_kfree_skb_irq(txi->tx_skb);
+		txi->tx_skb = NULL;
 		re->skb_free_idx++;
 		if (re->skb_free_idx >= NUM_TX_DESC)
 			re->skb_free_idx = 0;

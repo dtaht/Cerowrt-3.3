@@ -108,6 +108,7 @@ BUILD_LOG_DIR:=$(TOPDIR)/logs
 
 TARGET_PATH:=$(STAGING_DIR_HOST)/bin:$(subst $(space),:,$(filter-out .,$(filter-out ./,$(subst :,$(space),$(PATH)))))
 TARGET_CFLAGS:=$(TARGET_OPTIMIZATION)$(if $(CONFIG_DEBUG), -g3)
+TARGET_CXXFLAGS = $(TARGET_CFLAGS)
 TARGET_CPPFLAGS:=-I$(STAGING_DIR)/usr/include -I$(STAGING_DIR)/include
 TARGET_LDFLAGS:=-L$(STAGING_DIR)/usr/lib -L$(STAGING_DIR)/lib
 ifneq ($(CONFIG_EXTERNAL_TOOLCHAIN),)
@@ -219,7 +220,9 @@ else
     endif
   endif
   RSTRIP:= \
-    export CROSS="$(TARGET_CROSS)"; \
+    export CROSS="$(TARGET_CROSS)" \
+		$(if $(CONFIG_KERNEL_KALLSYMS),NO_RENAME=1) \
+		$(if $(CONFIG_KERNEL_PROFILING),KEEP_SYMBOLS=1); \
     NM="$(TARGET_CROSS)nm" \
     STRIP="$(STRIP)" \
     STRIP_KMOD="$(SCRIPT_DIR)/strip-kmod.sh" \

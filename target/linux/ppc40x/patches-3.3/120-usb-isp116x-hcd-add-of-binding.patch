@@ -262,7 +262,7 @@
  module_exit(isp116x_cleanup);
 --- a/drivers/usb/host/Kconfig
 +++ b/drivers/usb/host/Kconfig
-@@ -242,6 +242,24 @@ config USB_ISP116X_HCD
+@@ -251,6 +251,24 @@ config USB_ISP116X_HCD
  	  To compile this driver as a module, choose M here: the
  	  module will be called isp116x-hcd.
  

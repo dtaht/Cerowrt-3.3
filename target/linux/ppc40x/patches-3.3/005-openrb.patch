@@ -398,19 +398,19 @@
 +$(obj)/cuboot-openrb.o: BOOTCFLAGS += -mcpu=405
  $(obj)/treeboot-walnut.o: BOOTCFLAGS += -mcpu=405
  $(obj)/treeboot-iss4xx.o: BOOTCFLAGS += -mcpu=405
- $(obj)/virtex405-head.o: BOOTAFLAGS += -mcpu=405
-@@ -81,7 +82,7 @@ src-plat := of.c cuboot-52xx.c cuboot-82
+ $(obj)/treeboot-currituck.o: BOOTCFLAGS += -mcpu=405
+@@ -82,7 +83,7 @@ src-plat := of.c cuboot-52xx.c cuboot-82
  		virtex405-head.S virtex.c redboot-83xx.c cuboot-sam440ep.c \
  		cuboot-acadia.c cuboot-amigaone.c cuboot-kilauea.c \
  		gamecube-head.S gamecube.c wii-head.S wii.c treeboot-iss4xx.c \
--		cuboot-magicbox.c
-+		cuboot-magicbox.c cuboot-openrb.c
+-		treeboot-currituck.c cuboot-magicbox.c
++		treeboot-currituck.c cuboot-magicbox.c cuboot-openrb.c
  src-boot := $(src-wlib) $(src-plat) empty.c
  
  src-boot := $(addprefix $(obj)/, $(src-boot))
-@@ -202,6 +203,7 @@ image-$(CONFIG_HOTFOOT)			+= cuImage.hot
- image-$(CONFIG_WALNUT)			+= treeImage.walnut
+@@ -204,6 +205,7 @@ image-$(CONFIG_WALNUT)			+= treeImage.wa
  image-$(CONFIG_ACADIA)			+= cuImage.acadia
+ image-$(CONFIG_OBS600)			+= uImage.obs600
  image-$(CONFIG_MAGICBOX)		+= cuImage.magicbox
 +image-$(CONFIG_OPENRB)			+= cuImage.openrb
  
@@ -418,7 +418,7 @@
  image-$(CONFIG_EBONY)			+= treeImage.ebony cuImage.ebony
 --- a/arch/powerpc/platforms/40x/Kconfig
 +++ b/arch/powerpc/platforms/40x/Kconfig
-@@ -64,6 +64,16 @@ config MAGICBOX
+@@ -48,6 +48,16 @@ config MAGICBOX
  	help
  	  This option enables support for the Magicbox boards.
  
@@ -437,13 +437,11 @@
  	depends on 40x
 --- a/arch/powerpc/platforms/40x/ppc40x_simple.c
 +++ b/arch/powerpc/platforms/40x/ppc40x_simple.c
-@@ -56,7 +56,8 @@ static const char *board[] __initdata =
- 	"amcc,kilauea",
- 	"amcc,makalu",
+@@ -58,6 +58,7 @@ static const char *board[] __initdata =
+ 	"apm,klondike",
  	"est,hotfoot",
--	"magicbox"
-+	"magicbox",
-+	"openrb"
+ 	"magicbox",
++	"openrb",
+ 	"plathome,obs600"
  };
  
- static int __init ppc40x_probe(void)

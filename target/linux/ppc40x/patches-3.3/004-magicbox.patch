@@ -1,11 +1,11 @@
 --- /dev/null
-+++ b/arch/powerpc/boot/cuboot-openrb.c
-@@ -0,0 +1,94 @@
++++ b/arch/powerpc/boot/cuboot-magicbox.c
+@@ -0,0 +1,98 @@
 +/*
-+ * Old U-boot compatibility for OpenRB boards
++ * Old U-boot compatibility for Magicbox boards
 + *
-+ * Author: Gabor Juhos <juhosg@openwrt.org>
-+ *         Imre Kaloz <kaloz@openwrt.org>
++ * Author: Imre Kaloz <kaloz@openwrt.org>
++ *         Gabor Juhos <juhosg@openwrt.org>
 + *
 + * This program is free software; you can redistribute it and/or modify it
 + * under the terms of the GNU General Public License version 2 as published
@@ -28,6 +28,7 @@
 +
 +static void fixup_perwe(void)
 +{
++
 +#define DCRN_CPC0_PCI_BASE	0xf9
 +
 +	/* Turn on PerWE instead of PCIINT */
@@ -39,8 +40,9 @@
 +
 +static void fixup_cf_card(void)
 +{
-+#define CF_CS0_BASE		0xff100000
-+#define CF_CS1_BASE		0xff200000
++
++#define CF_CS0_BASE	0xff100000
++#define CF_CS1_BASE	0xff200000
 +
 +	/* PerCS1 (CF's CS0): base 0xff100000, 16-bit, rw */
 +	mtdcr(DCRN_EBC0_CFGADDR, EBC_B1CR);
@@ -60,28 +62,30 @@
 +#undef CF_CS1_BASE
 +}
 +
-+static void fixup_isp116x(void)
-+{
-+#define ISP116X_CS_BASE		0xf0000000
-+
-+	/* PerCS3 (ISP1160's CS): base 0xf0000000, size 32MB, 16-bit, rw */
-+	mtdcr(DCRN_EBC0_CFGADDR, EBC_B3CR);
-+	mtdcr(DCRN_EBC0_CFGDATA, ISP116X_CS_BASE | EBC_BXCR_BS_32M |
-+				 EBC_BXCR_BU_RW | EBC_BXCR_BW_16);
-+	mtdcr(DCRN_EBC0_CFGADDR, EBC_B3AP);
-+	mtdcr(DCRN_EBC0_CFGDATA, 0x03016600);
-+
-+#undef ISP116X_CS_BASE
-+}
-+
-+static void openrb_fixups(void)
++static void magicbox_fixups(void)
 +{
 +	ibm405ep_fixup_clocks(bd.bi_procfreq / 8);
 +	ibm4xx_sdram_fixup_memsize();
 +
-+	fixup_perwe();
-+	fixup_cf_card();
-+	fixup_isp116x();
++	/* Magicbox v1 has only one ethernet, one serial and no
++	 * CF slot -- detect it using it's fake enet1addr
++	 */
++	if ((bd.bi_enet1addr[2] == 0x02) &&
++	    (bd.bi_enet1addr[3] == 0xfa) &&
++	    (bd.bi_enet1addr[4] == 0xf0) &&
++	    (bd.bi_enet1addr[5] == 0x80)) {
++		void *devp;
++		devp = finddevice("/plb/opb/ethernet@ef600900");
++		del_node(devp);
++		devp = finddevice("/plb/opb/serial@ef600400");
++		del_node(devp);
++		devp = finddevice("/plb/ebc/cf_card@ff100000");
++		del_node(devp);
++
++	} else {
++		fixup_perwe();
++		fixup_cf_card();
++	}
 +
 +	dt_fixup_mac_addresses(&bd.bi_enetaddr, &bd.bi_enet1addr);
 +}
@@ -90,19 +94,19 @@
 +		unsigned long r6, unsigned long r7)
 +{
 +	CUBOOT_INIT();
-+	platform_ops.fixups = openrb_fixups;
++	platform_ops.fixups = magicbox_fixups;
 +	platform_ops.exit = ibm40x_dbcr_reset;
 +	fdt_init(_dtb_start);
 +	serial_console_init();
 +}
 --- /dev/null
-+++ b/arch/powerpc/boot/dts/openrb.dts
-@@ -0,0 +1,291 @@
++++ b/arch/powerpc/boot/dts/magicbox.dts
+@@ -0,0 +1,285 @@
 +/*
-+ * Device Tree Source for OpenRB boards
++ * Device Tree Source for Magicbox boards
 + *
++ * Copyright 2008-2009 Imre Kaloz <kaloz@openwrt.org>
 + * Copyright 2009 Gabor Juhos <juhosg@openwrt.org>
-+ * Copyright 2009 Imre Kaloz <kaloz@openwrt.org>
 + *
 + * Based on walnut.dts
 + *
@@ -116,8 +120,8 @@
 +/ {
 +	#address-cells = <1>;
 +	#size-cells = <1>;
-+	model = "openrb";
-+	compatible = "openrb";
++	model = "magicbox";
++	compatible = "magicbox";
 +	dcr-parent = <&{/cpus/cpu@0}>;
 +
 +	aliases {
@@ -225,6 +229,11 @@
 +				interrupt-parent = <&UIC0>;
 +				interrupts = <0x2 0x4>;
 +
++				dtt@48 {
++					compatible = "national,lm75";
++					reg = <0x48>;
++				};
++
 +				eeprom@50 {
 +					compatible = "at24,24c16";
 +					reg = <0x50>;
@@ -284,7 +293,7 @@
 +			leds {
 +				compatible = "gpio-leds";
 +				user {
-+					label = "openrb:green:user";
++					label = "magicbox:red:user";
 +					gpios = <&GPIO0 2 1>;
 +				};
 +			};
@@ -301,17 +310,6 @@
 +			 */
 +			clock-frequency = <0>; /* Filled in by zImage */
 +
-+			isp116x@f0000000 {
-+				compatible = "isp116x-hcd";
-+				oc_enable;
-+				int_act_high;
-+				int_edge_triggered;
-+				reg = <0x00000000 0xf0000000 0x00000002 /* data */
-+				       0x00000000 0xf1000000 0x00000002 /* addr */ >;
-+				interrupt-parent = <&UIC0>;
-+				interrupts = <0x1b 0x1 /* IRQ_TYPE_EDGE_RISING */ >;
-+			};
-+
 +			cf_card@ff100000 {
 +				compatible = "magicbox-cf", "pata-magicbox-cf";
 +				reg = <0x00000000 0xff100000 0x00001000
@@ -320,10 +318,10 @@
 +				interrupts = <0x19 0x1 /* IRQ_TYPE_EDGE_RISING */ >;
 +			};
 +
-+			nor_flash@ff800000 {
++			nor_flash@ffc00000 {
 +				compatible = "cfi-flash";
 +				bank-width = <2>;
-+				reg = <0x00000000 0xff800000 0x00800000>;
++				reg = <0x00000000 0xffc00000 0x00400000>;
 +				#address-cells = <1>;
 +				#size-cells = <1>;
 +				partition0@0 {
@@ -332,16 +330,16 @@
 +				};
 +				partition1@120000 {
 +					label = "rootfs";
-+					reg = <0x140000 0x680000>;
++					reg = <0x140000 0x280000>;
 +				};
-+				partition2@7c0000 {
++				partition2@3c0000 {
 +					label = "u-boot";
-+					reg = <0x7c0000 0x30000>;
++					reg = <0x3c0000 0x30000>;
 +					read-only;
 +				};
 +				partition3@0 {
 +					label = "firmware";
-+					reg = <0x0 0x7c0000>;
++					reg = <0x0 0x3c0000>;
 +				};
 +			};
 +		};
@@ -391,59 +389,57 @@
 +};
 --- a/arch/powerpc/boot/Makefile
 +++ b/arch/powerpc/boot/Makefile
-@@ -44,6 +44,7 @@ $(obj)/cuboot-taishan.o: BOOTCFLAGS += -
+@@ -43,6 +43,7 @@ $(obj)/cuboot-hotfoot.o: BOOTCFLAGS += -
+ $(obj)/cuboot-taishan.o: BOOTCFLAGS += -mcpu=440
  $(obj)/cuboot-katmai.o: BOOTCFLAGS += -mcpu=440
  $(obj)/cuboot-acadia.o: BOOTCFLAGS += -mcpu=405
- $(obj)/cuboot-magicbox.o: BOOTCFLAGS += -mcpu=405
-+$(obj)/cuboot-openrb.o: BOOTCFLAGS += -mcpu=405
++$(obj)/cuboot-magicbox.o: BOOTCFLAGS += -mcpu=405
  $(obj)/treeboot-walnut.o: BOOTCFLAGS += -mcpu=405
  $(obj)/treeboot-iss4xx.o: BOOTCFLAGS += -mcpu=405
- $(obj)/virtex405-head.o: BOOTAFLAGS += -mcpu=405
+ $(obj)/treeboot-currituck.o: BOOTCFLAGS += -mcpu=405
 @@ -81,7 +82,7 @@ src-plat := of.c cuboot-52xx.c cuboot-82
  		virtex405-head.S virtex.c redboot-83xx.c cuboot-sam440ep.c \
  		cuboot-acadia.c cuboot-amigaone.c cuboot-kilauea.c \
  		gamecube-head.S gamecube.c wii-head.S wii.c treeboot-iss4xx.c \
--		cuboot-magicbox.c
-+		cuboot-magicbox.c cuboot-openrb.c
+-		treeboot-currituck.c
++		treeboot-currituck.c cuboot-magicbox.c
  src-boot := $(src-wlib) $(src-plat) empty.c
  
  src-boot := $(addprefix $(obj)/, $(src-boot))
 @@ -202,6 +203,7 @@ image-$(CONFIG_HOTFOOT)			+= cuImage.hot
  image-$(CONFIG_WALNUT)			+= treeImage.walnut
  image-$(CONFIG_ACADIA)			+= cuImage.acadia
- image-$(CONFIG_MAGICBOX)		+= cuImage.magicbox
-+image-$(CONFIG_OPENRB)			+= cuImage.openrb
+ image-$(CONFIG_OBS600)			+= uImage.obs600
++image-$(CONFIG_MAGICBOX)		+= cuImage.magicbox
  
  # Board ports in arch/powerpc/platform/44x/Kconfig
  image-$(CONFIG_EBONY)			+= treeImage.ebony cuImage.ebony
 --- a/arch/powerpc/platforms/40x/Kconfig
 +++ b/arch/powerpc/platforms/40x/Kconfig
-@@ -64,6 +64,16 @@ config MAGICBOX
+@@ -38,6 +38,16 @@ config KILAUEA
  	help
- 	  This option enables support for the Magicbox boards.
+ 	  This option enables support for the AMCC PPC405EX evaluation board.
  
-+config OPENRB
-+	bool "OpenRB"
++config MAGICBOX
++	bool "Magicbox"
 +	depends on 40x
 +	default n
 +	select PPC40x_SIMPLE
 +	select 405EP
 +	select PCI
 +	help
-+	  This option enables support for the OpenRB boards.
++	  This option enables support for the Magicbox boards.
 +
  config MAKALU
  	bool "Makalu"
  	depends on 40x
 --- a/arch/powerpc/platforms/40x/ppc40x_simple.c
 +++ b/arch/powerpc/platforms/40x/ppc40x_simple.c
-@@ -56,7 +56,8 @@ static const char *board[] __initdata =
- 	"amcc,kilauea",
+@@ -57,6 +57,7 @@ static const char *board[] __initdata =
  	"amcc,makalu",
+ 	"apm,klondike",
  	"est,hotfoot",
--	"magicbox"
 +	"magicbox",
-+	"openrb"
+ 	"plathome,obs600"
  };
  
- static int __init ppc40x_probe(void)

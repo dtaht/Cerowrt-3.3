@@ -26,6 +26,7 @@ enum ramips_mach_type {
 	RAMIPS_MACH_DIR_600_B1,		/* D-Link DIR-600 B1 */
 	RAMIPS_MACH_DIR_600_B2,		/* D-Link DIR-600 B2 */
 	RAMIPS_MACH_RT_G32_B1,		/* Asus RT-G32 B1 */
+	RAMIPS_MACH_RT_N10_PLUS,	/* Asus RT-N10+ */
 	RAMIPS_MACH_NW718,		/* Netcore NW718 */
 
 	/* RT3052 based machines */
@@ -48,6 +49,7 @@ enum ramips_mach_type {
 	RAMIPS_MACH_WL351,		/* Sitecom WL-351 v1 002 */
 	RAMIPS_MACH_WR512_3GN,		/* SH-WR512NU/WS-WR512N1-like 3GN*/
 	RAMIPS_MACH_WR6202,		/* Accton WR6202 */
+	RAMIPS_MACH_XDXRN502J,          /* unknown XDX-RN502J */
 
 	/* RT3662 based machines */
 	RAMIPS_MACH_RT_N56U,		/* Asus RT-N56U */

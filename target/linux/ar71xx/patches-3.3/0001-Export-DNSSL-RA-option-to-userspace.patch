@@ -1,0 +1,71 @@
+From a28d966999d2ffb549d192d36d0ea54761627c7d Mon Sep 17 00:00:00 2001
+From: Pierre Ossman <pierre-list@ossman.eu>
+Date: Sun, 12 Dec 2010 03:43:00 +0000
+Subject: [PATCH] Export DNSSL RA option to userspace
+
+RFC 6106 specifies a new RA option for DNS resolver configuration that
+therefore needs to end up in userspace.
+
+This first patch just exports the new option, but I started thinking
+that this seems overly complex that the kernel needs to be updated
+every time there is something new of interest to userspace in the RA.
+So I also have a second patch that exports everything that the kernel
+doesn't want.
+
+Patches only compile tested so far as I'm still hacking away at
+userspace. Comments very much welcome though.
+
+Rgds
+Acked-by: Pierre Ynard <linkfanel@yahoo.fr>
+
+>From a5b60e80eeed87763c811ecfb0d7aa5695d0a2bf Mon Sep 17 00:00:00 2001
+From: Pierre Ossman <pierre@ossman.eu>
+Date: Sun, 12 Dec 2010 00:06:48 +0100
+Subject: [PATCH 1/2] ipv6: export DNS search list option to userspace
+
+Like DNS resolver addresses, the suffixes to be used in DNS lookups need
+to be configured by userspace. Make sure userspace has access to the
+option containing that information.
+
+Signed-off-by: Pierre Ossman <pierre@ossman.eu>
+---
+ include/net/ndisc.h |    3 ++-
+ net/ipv6/ndisc.c    |    8 +++++++-
+ 2 files changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/include/net/ndisc.h b/include/net/ndisc.h
+index e3133c2..359ccf6 100644
+--- a/include/net/ndisc.h
++++ b/include/net/ndisc.h
+@@ -33,7 +33,8 @@ enum {
+ 	ND_OPT_MTU = 5,			/* RFC2461 */
+ 	__ND_OPT_ARRAY_MAX,
+ 	ND_OPT_ROUTE_INFO = 24,		/* RFC4191 */
+-	ND_OPT_RDNSS = 25,		/* RFC5006 */
++	ND_OPT_RDNSS = 25,		/* RFC5006 / RFC6106 */
++	ND_OPT_DNSSL = 31,		/* RFC6106 */
+ 	__ND_OPT_MAX
+ };
+ 
+diff --git a/net/ipv6/ndisc.c b/net/ipv6/ndisc.c
+index c964958..671f7e0 100644
+--- a/net/ipv6/ndisc.c
++++ b/net/ipv6/ndisc.c
+@@ -228,7 +228,13 @@ static struct nd_opt_hdr *ndisc_next_option(struct nd_opt_hdr *cur,
+ 
+ static inline int ndisc_is_useropt(struct nd_opt_hdr *opt)
+ {
+-	return opt->nd_opt_type == ND_OPT_RDNSS;
++	switch (opt->nd_opt_type) {
++	case ND_OPT_RDNSS:
++	case ND_OPT_DNSSL: 
++		return 1;
++	default: 
++		return 0;
++	}
+ }
+ 
+ static struct nd_opt_hdr *ndisc_next_useropt(struct nd_opt_hdr *cur,
+-- 
+1.7.5.4
+

@@ -137,9 +137,11 @@ ar8216_id_chip(struct ar8216_priv *priv)
 	u16 id;
 	int i;
 
+	priv->chip = UNKNOWN;
+
 	val = ar8216_mii_read(priv, AR8216_REG_CTRL);
 	if (val == ~0)
-		return UNKNOWN;
+		return -ENODEV;
 
 	id = val & (AR8216_CTRL_REVISION | AR8216_CTRL_VERSION);
 	for (i = 0; i < AR8X16_PROBE_RETRIES; i++) {
@@ -147,21 +149,24 @@ ar8216_id_chip(struct ar8216_priv *priv)
 
 		val = ar8216_mii_read(priv, AR8216_REG_CTRL);
 		if (val == ~0)
-			return UNKNOWN;
+			return -ENODEV;
 
 		t = val & (AR8216_CTRL_REVISION | AR8216_CTRL_VERSION);
 		if (t != id)
-			return UNKNOWN;
+			return -ENODEV;
 	}
 
 	switch (id) {
 	case 0x0101:
-		return AR8216;
+		priv->chip = AR8216;
+		break;
 	case 0x0301:
-		return AR8236;
+		priv->chip = AR8236;
+		break;
 	case 0x1000:
 	case 0x1001:
-		return AR8316;
+		priv->chip = AR8316;
+		break;
 	default:
 		printk(KERN_DEBUG
 			"ar8216: Unknown Atheros device [ver=%d, rev=%d, phy_id=%04x%04x]\n",
@@ -170,8 +175,10 @@ ar8216_id_chip(struct ar8216_priv *priv)
 			mdiobus_read(priv->phy->bus, priv->phy->addr, 2),
 			mdiobus_read(priv->phy->bus, priv->phy->addr, 3));
 
-		return UNKNOWN;
+		return -ENODEV;
 	}
+
+	return 0;
 }
 
 static void
@@ -219,7 +226,7 @@ ar8216_read_port_link(struct ar8216_priv *priv, int port,
 
 static int
 ar8216_set_vlan(struct switch_dev *dev, const struct switch_attr *attr,
-                struct switch_val *val)
+		struct switch_val *val)
 {
 	struct ar8216_priv *priv = to_ar8216(dev);
 	priv->vlan = !!val->value.i;
@@ -228,7 +235,7 @@ ar8216_set_vlan(struct switch_dev *dev, const struct switch_attr *attr,
 
 static int
 ar8216_get_vlan(struct switch_dev *dev, const struct switch_attr *attr,
-                struct switch_val *val)
+		struct switch_val *val)
 {
 	struct ar8216_priv *priv = to_ar8216(dev);
 	val->value.i = priv->vlan;
@@ -260,7 +267,7 @@ ar8216_get_pvid(struct switch_dev *dev, int port, int *vlan)
 
 static int
 ar8216_set_vid(struct switch_dev *dev, const struct switch_attr *attr,
-                struct switch_val *val)
+	       struct switch_val *val)
 {
 	struct ar8216_priv *priv = to_ar8216(dev);
 	priv->vlan_id[val->port_vlan] = val->value.i;
@@ -269,7 +276,7 @@ ar8216_set_vid(struct switch_dev *dev, const struct switch_attr *attr,
 
 static int
 ar8216_get_vid(struct switch_dev *dev, const struct switch_attr *attr,
-                struct switch_val *val)
+	       struct switch_val *val)
 {
 	struct ar8216_priv *priv = to_ar8216(dev);
 	val->value.i = priv->vlan_id[val->port_vlan];
@@ -292,8 +299,8 @@ ar8216_mangle_tx(struct sk_buff *skb, struct net_device *dev)
 	struct ar8216_priv *priv = dev->phy_ptr;
 	unsigned char *buf;
 
-    if (unlikely(!priv))
-        goto error;
+	if (unlikely(!priv))
+		goto error;
 
 	if (!priv->vlan)
 		goto send;
@@ -444,9 +451,9 @@ ar8216_set_ports(struct switch_dev *dev, struct switch_val *val)
 	for (i = 0; i < val->len; i++) {
 		struct switch_port *p = &val->value.ports[i];
 
-		if (p->flags & (1 << SWITCH_PORT_FLAG_TAGGED))
+		if (p->flags & (1 << SWITCH_PORT_FLAG_TAGGED)) {
 			priv->vlan_tagged |= (1 << p->id);
-		else {
+		} else {
 			priv->vlan_tagged &= ~(1 << p->id);
 			priv->pvid[p->id] = val->port_vlan;
 
@@ -599,11 +606,10 @@ ar8216_hw_apply(struct switch_dev *dev)
 		int egress, ingress;
 		int pvid;
 
-		if (priv->vlan) {
+		if (priv->vlan)
 			pvid = priv->vlan_id[priv->pvid[i]];
-		} else {
+		else
 			pvid = i;
-		}
 
 		if (priv->vlan) {
 			if (priv->vlan_tagged & (1 << i))
@@ -613,11 +619,11 @@ ar8216_hw_apply(struct switch_dev *dev)
 		} else {
 			egress = AR8216_OUT_KEEP;
 		}
-		if (priv->vlan) {
+
+		if (priv->vlan)
 			ingress = AR8216_IN_SECURE;
-		} else {
+		else
 			ingress = AR8216_IN_PORT_ONLY;
-		}
 
 		if (priv->chip == AR8236)
 			ar8236_setup_port(priv, i, egress, ingress, portmask[i],
@@ -631,12 +637,23 @@ ar8216_hw_apply(struct switch_dev *dev)
 }
 
 static int
-ar8236_hw_init(struct ar8216_priv *priv) {
-	static int initialized;
+ar8216_hw_init(struct ar8216_priv *priv)
+{
+	/* XXX: undocumented magic from atheros, required! */
+	priv->write(priv, 0x38, 0xc000050e);
+
+	ar8216_rmw(priv, AR8216_REG_GLOBAL_CTRL,
+		   AR8216_GCTRL_MTU, 1518 + 8 + 2);
+	return 0;
+}
+
+static int
+ar8236_hw_init(struct ar8216_priv *priv)
+{
 	int i;
 	struct mii_bus *bus;
 
-	if (initialized)
+	if (priv->initialized)
 		return 0;
 
 	/* Initialize the PHYs */
@@ -649,12 +666,17 @@ ar8236_hw_init(struct ar8216_priv *priv) {
 	}
 	msleep(1000);
 
-	initialized = true;
+	/* enable jumbo frames */
+	ar8216_rmw(priv, AR8216_REG_GLOBAL_CTRL,
+		   AR8316_GCTRL_MTU, 9018 + 8 + 2);
+
+	priv->initialized = true;
 	return 0;
 }
 
 static int
-ar8316_hw_init(struct ar8216_priv *priv) {
+ar8316_hw_init(struct ar8216_priv *priv)
+{
 	int i;
 	u32 val, newval;
 	struct mii_bus *bus;
@@ -713,6 +735,13 @@ ar8316_hw_init(struct ar8216_priv *priv) {
 		msleep(1000);
 	}
 
+	/* enable jumbo frames */
+	ar8216_rmw(priv, AR8216_REG_GLOBAL_CTRL,
+		   AR8316_GCTRL_MTU, 9018 + 8 + 2);
+
+	/* enable cpu port to receive multicast and broadcast frames */
+	priv->write(priv, AR8216_REG_FLOOD_MASK, 0x003f003f);
+
 out:
 	priv->initialized = true;
 	return 0;
@@ -753,31 +782,14 @@ ar8216_reset_switch(struct switch_dev *dev)
 	mutex_lock(&priv->reg_mutex);
 	memset(&priv->vlan, 0, sizeof(struct ar8216_priv) -
 		offsetof(struct ar8216_priv, vlan));
-	for (i = 0; i < AR8X16_MAX_VLANS; i++) {
+
+	for (i = 0; i < AR8X16_MAX_VLANS; i++)
 		priv->vlan_id[i] = i;
-	}
 
 	/* Configure all ports */
 	for (i = 0; i < AR8216_NUM_PORTS; i++)
 		ar8216_init_port(priv, i);
 
-	/* XXX: undocumented magic from atheros, required! */
-	priv->write(priv, 0x38, 0xc000050e);
-
-	if (priv->chip == AR8216) {
-		ar8216_rmw(priv, AR8216_REG_GLOBAL_CTRL,
-			AR8216_GCTRL_MTU, 1518 + 8 + 2);
-	} else if (priv->chip == AR8316 ||
-		   priv->chip == AR8236) {
-		/* enable jumbo frames */
-		ar8216_rmw(priv, AR8216_REG_GLOBAL_CTRL,
-			AR8316_GCTRL_MTU, 9018 + 8 + 2);
-	}
-
-	if (priv->chip == AR8316) {
-		/* enable cpu port to receive multicast and broadcast frames */
-		priv->write(priv, AR8216_REG_FLOOD_MASK, 0x003f003f);
-	}
 	mutex_unlock(&priv->reg_mutex);
 	return ar8216_hw_apply(dev);
 }
@@ -821,7 +833,9 @@ ar8216_config_init(struct phy_device *pdev)
 
 	priv->phy = pdev;
 
-	priv->chip = ar8216_id_chip(priv);
+	ret = ar8216_id_chip(priv);
+	if (ret)
+		goto err_free_priv;
 
 	if (pdev->addr != 0) {
 		if (priv->chip == AR8316) {
@@ -892,34 +906,26 @@ ar8216_config_init(struct phy_device *pdev)
 		swdev->vlans = AR8216_NUM_VLANS;
 	}
 
-	if ((ret = register_switch(&priv->dev, pdev->attached_dev)) < 0) {
-		kfree(priv);
-		goto done;
-	}
+	ret = register_switch(&priv->dev, pdev->attached_dev);
+	if (ret)
+		goto err_free_priv;
 
 	priv->init = true;
 
-	if (priv->chip == AR8316) {
-		ret = ar8316_hw_init(priv);
-		if (ret) {
-			kfree(priv);
-			goto done;
-		}
-	}
-
-	if (priv->chip == AR8236) {
+	ret = 0;
+	if (priv->chip == AR8216)
+		ret = ar8216_hw_init(priv);
+	else if (priv->chip == AR8236)
 		ret = ar8236_hw_init(priv);
-		if (ret) {
-			kfree(priv);
-			goto done;
-		}
-	}
+	else if (priv->chip == AR8316)
+		ret = ar8316_hw_init(priv);
+
+	if (ret)
+		goto err_free_priv;
 
 	ret = ar8216_reset_switch(&priv->dev);
-	if (ret) {
-		kfree(priv);
-		goto done;
-	}
+	if (ret)
+		goto err_free_priv;
 
 	dev->phy_ptr = priv;
 
@@ -936,7 +942,10 @@ ar8216_config_init(struct phy_device *pdev)
 
 	priv->init = false;
 
-done:
+	return 0;
+
+err_free_priv:
+	kfree(priv);
 	return ret;
 }
 
@@ -946,9 +955,9 @@ ar8216_read_status(struct phy_device *phydev)
 	struct ar8216_priv *priv = phydev->priv;
 	struct switch_port_link link;
 	int ret;
-	if (phydev->addr != 0) {
+
+	if (phydev->addr != 0)
 		return genphy_read_status(phydev);
-	}
 
 	ar8216_read_port_link(priv, phydev->addr, &link);
 	phydev->link = !!link.link;
@@ -957,13 +966,13 @@ ar8216_read_status(struct phy_device *phydev)
 
 	switch (link.speed) {
 	case SWITCH_PORT_SPEED_10:
-	    	phydev->speed = SPEED_10;
+		phydev->speed = SPEED_10;
 		break;
 	case SWITCH_PORT_SPEED_100:
-	    	phydev->speed = SPEED_100;
+		phydev->speed = SPEED_100;
 		break;
 	case SWITCH_PORT_SPEED_1000:
-	    	phydev->speed = SPEED_1000;
+		phydev->speed = SPEED_1000;
 		break;
 	default:
 		phydev->speed = 0;
@@ -997,14 +1006,9 @@ static int
 ar8216_probe(struct phy_device *pdev)
 {
 	struct ar8216_priv priv;
-	u16 chip;
 
 	priv.phy = pdev;
-	chip = ar8216_id_chip(&priv);
-	if (chip == UNKNOWN)
-		return -ENODEV;
-
-	return 0;
+	return ar8216_id_chip(&priv);
 }
 
 static void

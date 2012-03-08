@@ -9,15 +9,22 @@ include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/kernel.mk
 
 PKG_NAME:=iptables
-PKG_VERSION:=1.4.12.1
+PKG_VERSION:=1.4.12.2-1git
 PKG_RELEASE:=5
 
-PKG_MD5SUM:=b08a1195ec2c1ebeaf072db3c55fdf43
-PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
-PKG_SOURCE_URL:=http://www.netfilter.org/projects/iptables/files \
-	ftp://ftp.be.netfilter.org/pub/netfilter/iptables/ \
-	ftp://ftp.de.netfilter.org/pub/netfilter/iptables/ \
-	ftp://ftp.no.netfilter.org/pub/netfilter/iptables/
+PKG_SOURCE_PROTO:=git
+PKG_SOURCE_URL:=git://git.netfilter.org/iptables.git
+PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+PKG_SOURCE_VERSION:=7c1b69b97571ddeb8c624b0a1da366a456895a6d
+PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
+PKG_BUILD_DIR:=$(BUILD_DIR)/iptables-$(PKG_VERSION)
+
+#PKG_MD5SUM:=b08a1195ec2c1ebeaf072db3c55fdf43
+#PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
+#PKG_SOURCE_URL:=http://www.netfilter.org/projects/iptables/files \
+#	ftp://ftp.be.netfilter.org/pub/netfilter/iptables/ \
+#	ftp://ftp.de.netfilter.org/pub/netfilter/iptables/ \
+#	ftp://ftp.no.netfilter.org/pub/netfilter/iptables/
 
 PKG_FIXUP:=autoreconf
 PKG_INSTALL:=1

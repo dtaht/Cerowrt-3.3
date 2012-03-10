@@ -1,6 +1,62 @@
 --- a/drivers/net/wireless/ath/ath9k/ar9003_mac.c
 +++ b/drivers/net/wireless/ath/ath9k/ar9003_mac.c
-@@ -510,7 +510,11 @@ int ath9k_hw_process_rxdesc_edma(struct 
+@@ -326,7 +326,6 @@ static bool ar9003_hw_get_isr(struct ath
+ static int ar9003_hw_proc_txdesc(struct ath_hw *ah, void *ds,
+ 				 struct ath_tx_status *ts)
+ {
+-	struct ar9003_txc *txc = (struct ar9003_txc *) ds;
+ 	struct ar9003_txs *ads;
+ 	u32 status;
+ 
+@@ -336,11 +335,7 @@ static int ar9003_hw_proc_txdesc(struct 
+ 	if ((status & AR_TxDone) == 0)
+ 		return -EINPROGRESS;
+ 
+-	ts->qid = MS(ads->ds_info, AR_TxQcuNum);
+-	if (!txc || (MS(txc->info, AR_TxQcuNum) == ts->qid))
+-		ah->ts_tail = (ah->ts_tail + 1) % ah->ts_size;
+-	else
+-		return -ENOENT;
++	ah->ts_tail = (ah->ts_tail + 1) % ah->ts_size;
+ 
+ 	if ((MS(ads->ds_info, AR_DescId) != ATHEROS_VENDOR_ID) ||
+ 	    (MS(ads->ds_info, AR_TxRxDesc) != 1)) {
+@@ -354,6 +349,7 @@ static int ar9003_hw_proc_txdesc(struct 
+ 	ts->ts_seqnum = MS(status, AR_SeqNum);
+ 	ts->tid = MS(status, AR_TxTid);
+ 
++	ts->qid = MS(ads->ds_info, AR_TxQcuNum);
+ 	ts->desc_id = MS(ads->status1, AR_TxDescId);
+ 	ts->ts_tstamp = ads->status4;
+ 	ts->ts_status = 0;
+@@ -440,20 +436,14 @@ int ath9k_hw_process_rxdesc_edma(struct 
+ 	struct ar9003_rxs *rxsp = (struct ar9003_rxs *) buf_addr;
+ 	unsigned int phyerr;
+ 
+-	/* TODO: byte swap on big endian for ar9300_10 */
+-
+-	if (!rxs) {
+-		if ((rxsp->status11 & AR_RxDone) == 0)
+-			return -EINPROGRESS;
+-
+-		if (MS(rxsp->ds_info, AR_DescId) != 0x168c)
+-			return -EINVAL;
++	if ((rxsp->status11 & AR_RxDone) == 0)
++		return -EINPROGRESS;
+ 
+-		if ((rxsp->ds_info & (AR_TxRxDesc | AR_CtrlStat)) != 0)
+-			return -EINPROGRESS;
++	if (MS(rxsp->ds_info, AR_DescId) != 0x168c)
++		return -EINVAL;
+ 
+-		return 0;
+-	}
++	if ((rxsp->ds_info & (AR_TxRxDesc | AR_CtrlStat)) != 0)
++		return -EINPROGRESS;
+ 
+ 	rxs->rs_status = 0;
+ 	rxs->rs_flags =  0;
+@@ -510,7 +500,11 @@ int ath9k_hw_process_rxdesc_edma(struct 
  		 */
  		if (rxsp->status11 & AR_CRCErr)
  			rxs->rs_status |= ATH9K_RXERR_CRC;
@@ -13,7 +69,7 @@
  			phyerr = MS(rxsp->status11, AR_PHYErrCode);
  			/*
  			 * If we reach a point here where AR_PostDelimCRCErr is
-@@ -532,11 +536,7 @@ int ath9k_hw_process_rxdesc_edma(struct 
+@@ -532,11 +526,7 @@ int ath9k_hw_process_rxdesc_edma(struct 
  				rxs->rs_status |= ATH9K_RXERR_PHY;
  				rxs->rs_phyerr = phyerr;
  			}
@@ -130,7 +186,24 @@
  	IEEE80211_TX_CTL_MORE_FRAMES | IEEE80211_TX_CTL_LDPC |		      \
  	IEEE80211_TX_CTL_STBC | IEEE80211_TX_STATUS_EOSP)
  
-@@ -1634,7 +1634,7 @@ void ieee80211_free_txskb(struct ieee802
+@@ -659,6 +659,8 @@ ieee80211_tx_info_clear_status(struct ie
+  * @RX_FLAG_HT: HT MCS was used and rate_idx is MCS index
+  * @RX_FLAG_40MHZ: HT40 (40 MHz) was used
+  * @RX_FLAG_SHORT_GI: Short guard interval was used
++ * @RX_FLAG_NO_SIGNAL_VAL: The signal strength value is not present.
++ *	Valid only for data frames (mainly A-MPDU)
+  */
+ enum mac80211_rx_flags {
+ 	RX_FLAG_MMIC_ERROR	= 1<<0,
+@@ -672,6 +674,7 @@ enum mac80211_rx_flags {
+ 	RX_FLAG_HT		= 1<<9,
+ 	RX_FLAG_40MHZ		= 1<<10,
+ 	RX_FLAG_SHORT_GI	= 1<<11,
++	RX_FLAG_NO_SIGNAL_VAL	= 1<<12,
+ };
+ 
+ /**
+@@ -1634,7 +1637,7 @@ void ieee80211_free_txskb(struct ieee802
   * the station sends a PS-Poll or a uAPSD trigger frame, mac80211
   * will inform the driver of this with the @allow_buffered_frames
   * callback; this callback is optional. mac80211 will then transmit
@@ -139,7 +212,7 @@
   * on each frame. The last frame in the service period (or the only
   * response to a PS-Poll) also has %IEEE80211_TX_STATUS_EOSP set to
   * indicate that it ends the service period; as this frame must have
-@@ -1642,6 +1642,9 @@ void ieee80211_free_txskb(struct ieee802
+@@ -1642,6 +1645,9 @@ void ieee80211_free_txskb(struct ieee802
   * When TX status is reported for this frame, the service period is
   * marked has having ended and a new one can be started by the peer.
   *
@@ -149,7 +222,7 @@
   * Another race condition can happen on some devices like iwlwifi
   * when there are frames queued for the station and it wakes up
   * or polls; the frames that are already queued could end up being
-@@ -2140,7 +2143,7 @@ enum ieee80211_frame_release_type {
+@@ -2140,7 +2146,7 @@ enum ieee80211_frame_release_type {
   * @allow_buffered_frames: Prepare device to allow the given number of frames
   *	to go out to the given station. The frames will be sent by mac80211
   *	via the usual TX path after this call. The TX information for frames
@@ -337,7 +410,17 @@
  			break;
 --- a/net/mac80211/rx.c
 +++ b/net/mac80211/rx.c
-@@ -489,12 +489,12 @@ ieee80211_rx_mesh_check(struct ieee80211
+@@ -177,7 +177,8 @@ ieee80211_add_rx_radiotap_header(struct 
+ 	pos += 2;
+ 
+ 	/* IEEE80211_RADIOTAP_DBM_ANTSIGNAL */
+-	if (local->hw.flags & IEEE80211_HW_SIGNAL_DBM) {
++	if (local->hw.flags & IEEE80211_HW_SIGNAL_DBM &&
++	    !(status->flag & RX_FLAG_NO_SIGNAL_VAL)) {
+ 		*pos = status->signal;
+ 		rthdr->it_present |=
+ 			cpu_to_le32(1 << IEEE80211_RADIOTAP_DBM_ANTSIGNAL);
+@@ -489,12 +490,12 @@ ieee80211_rx_mesh_check(struct ieee80211
  			if (ieee80211_has_tods(hdr->frame_control) ||
  				!ieee80211_has_fromds(hdr->frame_control))
  				return RX_DROP_MONITOR;
@@ -352,7 +435,20 @@
  				return RX_DROP_MONITOR;
  		}
  	}
-@@ -2282,6 +2282,7 @@ ieee80211_rx_h_action(struct ieee80211_r
+@@ -1309,8 +1310,10 @@ ieee80211_rx_h_sta_process(struct ieee80
+ 
+ 	sta->rx_fragments++;
+ 	sta->rx_bytes += rx->skb->len;
+-	sta->last_signal = status->signal;
+-	ewma_add(&sta->avg_signal, -status->signal);
++	if (!(status->flag & RX_FLAG_NO_SIGNAL_VAL)) {
++		sta->last_signal = status->signal;
++		ewma_add(&sta->avg_signal, -status->signal);
++	}
+ 
+ 	/*
+ 	 * Change STA power saving mode only at the end of a frame
+@@ -2282,6 +2285,7 @@ ieee80211_rx_h_action(struct ieee80211_r
  		    sdata->vif.type != NL80211_IFTYPE_MESH_POINT &&
  		    sdata->vif.type != NL80211_IFTYPE_AP_VLAN &&
  		    sdata->vif.type != NL80211_IFTYPE_AP &&
@@ -360,7 +456,7 @@
  		    sdata->vif.type != NL80211_IFTYPE_ADHOC)
  			break;
  
-@@ -2336,7 +2337,7 @@ ieee80211_rx_h_action(struct ieee80211_r
+@@ -2336,7 +2340,7 @@ ieee80211_rx_h_action(struct ieee80211_r
  			if (sdata->vif.type != NL80211_IFTYPE_STATION)
  				break;
  
@@ -369,7 +465,7 @@
  				break;
  
  			goto queue;
-@@ -2492,14 +2493,15 @@ ieee80211_rx_h_mgmt(struct ieee80211_rx_
+@@ -2492,14 +2496,15 @@ ieee80211_rx_h_mgmt(struct ieee80211_rx_
  
  	if (!ieee80211_vif_is_mesh(&sdata->vif) &&
  	    sdata->vif.type != NL80211_IFTYPE_ADHOC &&
@@ -387,7 +483,7 @@
  		break;
  	case cpu_to_le16(IEEE80211_STYPE_ASSOC_RESP):
  	case cpu_to_le16(IEEE80211_STYPE_REASSOC_RESP):
-@@ -2853,10 +2855,16 @@ static int prepare_for_handlers(struct i
+@@ -2853,10 +2858,16 @@ static int prepare_for_handlers(struct i
  		}
  		break;
  	case NL80211_IFTYPE_WDS:
@@ -519,6 +615,28 @@
  #ifdef CONFIG_MAC80211_VERBOSE_PS_DEBUG
  		printk(KERN_DEBUG "STA %pM aid %d: PS buffer for AC %d\n",
  		       sta->sta.addr, sta->sta.aid, ac);
+@@ -1060,6 +1065,7 @@ static bool ieee80211_tx_prep_agg(struct
+ {
+ 	bool queued = false;
+ 	bool reset_agg_timer = false;
++	struct sk_buff *purge_skb = NULL;
+ 
+ 	if (test_bit(HT_AGG_STATE_OPERATIONAL, &tid_tx->state)) {
+ 		info->flags |= IEEE80211_TX_CTL_AMPDU;
+@@ -1101,8 +1107,13 @@ static bool ieee80211_tx_prep_agg(struct
+ 			info->control.vif = &tx->sdata->vif;
+ 			info->flags |= IEEE80211_TX_INTFL_NEED_TXPROCESSING;
+ 			__skb_queue_tail(&tid_tx->pending, skb);
++			if (skb_queue_len(&tid_tx->pending) > STA_MAX_TX_BUFFER)
++				purge_skb = __skb_dequeue(&tid_tx->pending);
+ 		}
+ 		spin_unlock(&tx->sta->lock);
++
++		if (purge_skb)
++			dev_kfree_skb(purge_skb);
+ 	}
+ 
+ 	/* reset session timer */
 --- a/net/mac80211/ieee80211_i.h
 +++ b/net/mac80211/ieee80211_i.h
 @@ -480,7 +480,7 @@ struct ieee80211_if_ibss {
@@ -1030,15 +1148,53 @@
  
  #undef TX_SAMP_DBG
  }
-@@ -1019,6 +1021,7 @@ void ath_debug_stat_rx(struct ath_softc 
+@@ -942,27 +944,6 @@ static ssize_t read_file_recv(struct fil
+ 	PHY_ERR("HT-RATE ERR", ATH9K_PHYERR_HT_RATE_ILLEGAL);
  
- 	sc->debug.stats.rxstats.rs_antenna = rs->rs_antenna;
+ 	len += snprintf(buf + len, size - len,
+-			"%22s : %10d\n", "RSSI-CTL0",
+-			sc->debug.stats.rxstats.rs_rssi_ctl0);
+-	len += snprintf(buf + len, size - len,
+-			"%22s : %10d\n", "RSSI-CTL1",
+-			sc->debug.stats.rxstats.rs_rssi_ctl1);
+-	len += snprintf(buf + len, size - len,
+-			"%22s : %10d\n", "RSSI-CTL2",
+-			sc->debug.stats.rxstats.rs_rssi_ctl2);
+-	len += snprintf(buf + len, size - len,
+-			"%22s : %10d\n", "RSSI-EXT0",
+-			sc->debug.stats.rxstats.rs_rssi_ext0);
+-	len += snprintf(buf + len, size - len,
+-			"%22s : %10d\n", "RSSI-EXT1",
+-			sc->debug.stats.rxstats.rs_rssi_ext1);
+-	len += snprintf(buf + len, size - len,
+-			"%22s : %10d\n", "RSSI-EXT2",
+-			sc->debug.stats.rxstats.rs_rssi_ext2);
+-	len += snprintf(buf + len, size - len,
+-			"%22s : %10d\n", "Rx Antenna",
+-			sc->debug.stats.rxstats.rs_antenna);
+-	len += snprintf(buf + len, size - len,
+ 			"%22s : %10u\n", "RX-Pkts-All",
+ 			sc->debug.stats.rxstats.rx_pkts_all);
+ 	len += snprintf(buf + len, size - len,
+@@ -1009,16 +990,7 @@ void ath_debug_stat_rx(struct ath_softc 
+ 			RX_PHY_ERR_INC(rs->rs_phyerr);
+ 	}
  
+-	sc->debug.stats.rxstats.rs_rssi_ctl0 = rs->rs_rssi_ctl0;
+-	sc->debug.stats.rxstats.rs_rssi_ctl1 = rs->rs_rssi_ctl1;
+-	sc->debug.stats.rxstats.rs_rssi_ctl2 = rs->rs_rssi_ctl2;
+-
+-	sc->debug.stats.rxstats.rs_rssi_ext0 = rs->rs_rssi_ext0;
+-	sc->debug.stats.rxstats.rs_rssi_ext1 = rs->rs_rssi_ext1;
+-	sc->debug.stats.rxstats.rs_rssi_ext2 = rs->rs_rssi_ext2;
+-
+-	sc->debug.stats.rxstats.rs_antenna = rs->rs_antenna;
+-
 +#ifdef CONFIG_ATH9K_MAC_DEBUG
  	spin_lock(&sc->debug.samp_lock);
  	RX_SAMP_DBG(jiffies) = jiffies;
  	RX_SAMP_DBG(rssi_ctl0) = rs->rs_rssi_ctl0;
-@@ -1035,6 +1038,8 @@ void ath_debug_stat_rx(struct ath_softc 
+@@ -1035,6 +1007,8 @@ void ath_debug_stat_rx(struct ath_softc 
  	sc->debug.rsidx = (sc->debug.rsidx + 1) % ATH_DBG_MAX_SAMPLES;
  	spin_unlock(&sc->debug.samp_lock);
  
@@ -1047,7 +1203,7 @@
  #undef RX_STAT_INC
  #undef RX_PHY_ERR_INC
  #undef RX_SAMP_DBG
-@@ -1278,6 +1283,8 @@ static const struct file_operations fops
+@@ -1278,6 +1252,8 @@ static const struct file_operations fops
  	.llseek = default_llseek,
  };
  
@@ -1056,7 +1212,7 @@
  void ath9k_debug_samp_bb_mac(struct ath_softc *sc)
  {
  #define ATH_SAMP_DBG(c) (sc->debug.bb_mac_samp[sc->debug.sampidx].c)
-@@ -1551,6 +1558,7 @@ static const struct file_operations fops
+@@ -1551,6 +1527,7 @@ static const struct file_operations fops
  	.llseek = default_llseek,
  };
  
@@ -1064,7 +1220,7 @@
  
  int ath9k_init_debug(struct ath_hw *ah)
  {
-@@ -1604,8 +1612,10 @@ int ath9k_init_debug(struct ath_hw *ah)
+@@ -1604,8 +1581,10 @@ int ath9k_init_debug(struct ath_hw *ah)
  			    &fops_base_eeprom);
  	debugfs_create_file("modal_eeprom", S_IRUSR, sc->debug.debugfs_phy, sc,
  			    &fops_modal_eeprom);
@@ -1077,7 +1233,21 @@
  			   sc->debug.debugfs_phy, &sc->sc_ah->gpio_mask);
 --- a/drivers/net/wireless/ath/ath9k/debug.h
 +++ b/drivers/net/wireless/ath/ath9k/debug.h
-@@ -235,16 +235,17 @@ struct ath9k_debug {
+@@ -165,13 +165,6 @@ struct ath_rx_stats {
+ 	u32 post_delim_crc_err;
+ 	u32 decrypt_busy_err;
+ 	u32 phy_err_stats[ATH9K_PHYERR_MAX];
+-	int8_t rs_rssi_ctl0;
+-	int8_t rs_rssi_ctl1;
+-	int8_t rs_rssi_ctl2;
+-	int8_t rs_rssi_ext0;
+-	int8_t rs_rssi_ext1;
+-	int8_t rs_rssi_ext2;
+-	u8 rs_antenna;
+ };
+ 
+ enum ath_reset_type {
+@@ -235,16 +228,17 @@ struct ath9k_debug {
  	struct dentry *debugfs_phy;
  	u32 regidx;
  	struct ath_stats stats;
@@ -1096,7 +1266,7 @@
  void ath_debug_stat_interrupt(struct ath_softc *sc, enum ath9k_int status);
  void ath_debug_stat_tx(struct ath_softc *sc, struct ath_buf *bf,
  		       struct ath_tx_status *ts, struct ath_txq *txq,
-@@ -258,10 +259,6 @@ static inline int ath9k_init_debug(struc
+@@ -258,10 +252,6 @@ static inline int ath9k_init_debug(struc
  	return 0;
  }
  
@@ -1107,7 +1277,7 @@
  static inline void ath_debug_stat_interrupt(struct ath_softc *sc,
  					    enum ath9k_int status)
  {
-@@ -282,4 +279,17 @@ static inline void ath_debug_stat_rx(str
+@@ -282,4 +272,17 @@ static inline void ath_debug_stat_rx(str
  
  #endif /* CONFIG_ATH9K_DEBUGFS */
  
@@ -1140,3 +1310,639 @@
  	tasklet_init(&sc->intr_tq, ath9k_tasklet, (unsigned long)sc);
  	tasklet_init(&sc->bcon_tasklet, ath_beacon_tasklet,
  		     (unsigned long)sc);
+--- a/drivers/net/wireless/ath/ath9k/hw.c
++++ b/drivers/net/wireless/ath/ath9k/hw.c
+@@ -1386,10 +1386,16 @@ static bool ath9k_hw_set_reset_reg(struc
+ static bool ath9k_hw_chip_reset(struct ath_hw *ah,
+ 				struct ath9k_channel *chan)
+ {
+-	if (AR_SREV_9280(ah) && ah->eep_ops->get_eeprom(ah, EEP_OL_PWRCTRL)) {
+-		if (!ath9k_hw_set_reset_reg(ah, ATH9K_RESET_POWER_ON))
+-			return false;
+-	} else if (!ath9k_hw_set_reset_reg(ah, ATH9K_RESET_WARM))
++	int reset_type = ATH9K_RESET_WARM;
++
++	if (AR_SREV_9280(ah)) {
++		if (ah->eep_ops->get_eeprom(ah, EEP_OL_PWRCTRL))
++			reset_type = ATH9K_RESET_POWER_ON;
++		else
++			reset_type = ATH9K_RESET_COLD;
++	}
++
++	if (!ath9k_hw_set_reset_reg(ah, reset_type))
+ 		return false;
+ 
+ 	if (!ath9k_hw_setpower(ah, ATH9K_PM_AWAKE))
+--- a/drivers/net/wireless/ath/ath5k/base.c
++++ b/drivers/net/wireless/ath/ath5k/base.c
+@@ -2330,15 +2330,6 @@ ath5k_calibrate_work(struct work_struct 
+ 					"got new rfgain, resetting\n");
+ 			ieee80211_queue_work(ah->hw, &ah->reset_work);
+ 		}
+-
+-		/* TODO: On full calibration we should stop TX here,
+-		 * so that it doesn't interfere (mostly due to gain_f
+-		 * calibration that messes with tx packets -see phy.c).
+-		 *
+-		 * NOTE: Stopping the queues from above is not enough
+-		 * to stop TX but saves us from disconecting (at least
+-		 * we don't lose packets). */
+-		ieee80211_stop_queues(ah->hw);
+ 	} else
+ 		ah->ah_cal_mask |= AR5K_CALIBRATION_SHORT;
+ 
+@@ -2353,10 +2344,9 @@ ath5k_calibrate_work(struct work_struct 
+ 				ah->curchan->center_freq));
+ 
+ 	/* Clear calibration flags */
+-	if (ah->ah_cal_mask & AR5K_CALIBRATION_FULL) {
+-		ieee80211_wake_queues(ah->hw);
++	if (ah->ah_cal_mask & AR5K_CALIBRATION_FULL)
+ 		ah->ah_cal_mask &= ~AR5K_CALIBRATION_FULL;
+-	} else if (ah->ah_cal_mask & AR5K_CALIBRATION_SHORT)
++	else if (ah->ah_cal_mask & AR5K_CALIBRATION_SHORT)
+ 		ah->ah_cal_mask &= ~AR5K_CALIBRATION_SHORT;
+ }
+ 
+--- a/drivers/net/wireless/ath/ath5k/phy.c
++++ b/drivers/net/wireless/ath/ath5k/phy.c
+@@ -1871,31 +1871,15 @@ ath5k_hw_phy_calibrate(struct ath5k_hw *
+ 		ret = 0;
+ 	}
+ 
+-	/* On full calibration do an AGC calibration and
+-	 * request a PAPD probe for gainf calibration if
+-	 * needed */
+-	if (ah->ah_cal_mask & AR5K_CALIBRATION_FULL) {
++	/* On full calibration request a PAPD probe for
++	 * gainf calibration if needed */
++	if ((ah->ah_cal_mask & AR5K_CALIBRATION_FULL) &&
++	    (ah->ah_radio == AR5K_RF5111 ||
++	     ah->ah_radio == AR5K_RF5112) &&
++	    channel->hw_value != AR5K_MODE_11B)
++		ath5k_hw_request_rfgain_probe(ah);
+ 
+-		AR5K_REG_ENABLE_BITS(ah, AR5K_PHY_AGCCTL,
+-					AR5K_PHY_AGCCTL_CAL);
+-
+-		ret = ath5k_hw_register_timeout(ah, AR5K_PHY_AGCCTL,
+-			AR5K_PHY_AGCCTL_CAL | AR5K_PHY_AGCCTL_NF,
+-			0, false);
+-		if (ret) {
+-			ATH5K_ERR(ah,
+-				"gain calibration timeout (%uMHz)\n",
+-				channel->center_freq);
+-		}
+-
+-		if ((ah->ah_radio == AR5K_RF5111 ||
+-			ah->ah_radio == AR5K_RF5112)
+-			&& (channel->hw_value != AR5K_MODE_11B))
+-			ath5k_hw_request_rfgain_probe(ah);
+-	}
+-
+-	/* Update noise floor
+-	 * XXX: Only do this after AGC calibration */
++	/* Update noise floor */
+ 	if (!(ah->ah_cal_mask & AR5K_CALIBRATION_NF))
+ 		ath5k_hw_update_noise_floor(ah);
+ 
+--- a/drivers/net/wireless/ath/ath9k/recv.c
++++ b/drivers/net/wireless/ath/ath9k/recv.c
+@@ -232,7 +232,6 @@ static void ath_rx_edma_cleanup(struct a
+ static void ath_rx_edma_init_queue(struct ath_rx_edma *rx_edma, int size)
+ {
+ 	skb_queue_head_init(&rx_edma->rx_fifo);
+-	skb_queue_head_init(&rx_edma->rx_buffers);
+ 	rx_edma->rx_fifo_hwsize = size;
+ }
+ 
+@@ -658,7 +657,9 @@ static void ath_rx_ps(struct ath_softc *
+ }
+ 
+ static bool ath_edma_get_buffers(struct ath_softc *sc,
+-				 enum ath9k_rx_qtype qtype)
++				 enum ath9k_rx_qtype qtype,
++				 struct ath_rx_status *rs,
++				 struct ath_buf **dest)
+ {
+ 	struct ath_rx_edma *rx_edma = &sc->rx.rx_edma[qtype];
+ 	struct ath_hw *ah = sc->sc_ah;
+@@ -677,7 +678,7 @@ static bool ath_edma_get_buffers(struct 
+ 	dma_sync_single_for_cpu(sc->dev, bf->bf_buf_addr,
+ 				common->rx_bufsize, DMA_FROM_DEVICE);
+ 
+-	ret = ath9k_hw_process_rxdesc_edma(ah, NULL, skb->data);
++	ret = ath9k_hw_process_rxdesc_edma(ah, rs, skb->data);
+ 	if (ret == -EINPROGRESS) {
+ 		/*let device gain the buffer again*/
+ 		dma_sync_single_for_device(sc->dev, bf->bf_buf_addr,
+@@ -690,20 +691,21 @@ static bool ath_edma_get_buffers(struct 
+ 		/* corrupt descriptor, skip this one and the following one */
+ 		list_add_tail(&bf->list, &sc->rx.rxbuf);
+ 		ath_rx_edma_buf_link(sc, qtype);
+-		skb = skb_peek(&rx_edma->rx_fifo);
+-		if (!skb)
+-			return true;
+ 
+-		bf = SKB_CB_ATHBUF(skb);
+-		BUG_ON(!bf);
++		skb = skb_peek(&rx_edma->rx_fifo);
++		if (skb) {
++			bf = SKB_CB_ATHBUF(skb);
++			BUG_ON(!bf);
+ 
+-		__skb_unlink(skb, &rx_edma->rx_fifo);
+-		list_add_tail(&bf->list, &sc->rx.rxbuf);
+-		ath_rx_edma_buf_link(sc, qtype);
+-		return true;
++			__skb_unlink(skb, &rx_edma->rx_fifo);
++			list_add_tail(&bf->list, &sc->rx.rxbuf);
++			ath_rx_edma_buf_link(sc, qtype);
++		} else {
++			bf = NULL;
++		}
+ 	}
+-	skb_queue_tail(&rx_edma->rx_buffers, skb);
+ 
++	*dest = bf;
+ 	return true;
+ }
+ 
+@@ -711,18 +713,15 @@ static struct ath_buf *ath_edma_get_next
+ 						struct ath_rx_status *rs,
+ 						enum ath9k_rx_qtype qtype)
+ {
+-	struct ath_rx_edma *rx_edma = &sc->rx.rx_edma[qtype];
+-	struct sk_buff *skb;
+-	struct ath_buf *bf;
++	struct ath_buf *bf = NULL;
+ 
+-	while (ath_edma_get_buffers(sc, qtype));
+-	skb = __skb_dequeue(&rx_edma->rx_buffers);
+-	if (!skb)
+-		return NULL;
++	while (ath_edma_get_buffers(sc, qtype, rs, &bf)) {
++		if (!bf)
++			continue;
+ 
+-	bf = SKB_CB_ATHBUF(skb);
+-	ath9k_hw_process_rxdesc_edma(sc->sc_ah, rs, skb->data);
+-	return bf;
++		return bf;
++	}
++	return NULL;
+ }
+ 
+ static struct ath_buf *ath_get_next_rx_buf(struct ath_softc *sc,
+@@ -954,6 +953,7 @@ static void ath9k_process_rssi(struct at
+ 	struct ath_softc *sc = hw->priv;
+ 	struct ath_hw *ah = common->ah;
+ 	int last_rssi;
++	int rssi = rx_stats->rs_rssi;
+ 
+ 	if (!rx_stats->is_mybeacon ||
+ 	    ((ah->opmode != NL80211_IFTYPE_STATION) &&
+@@ -965,13 +965,12 @@ static void ath9k_process_rssi(struct at
+ 
+ 	last_rssi = sc->last_rssi;
+ 	if (likely(last_rssi != ATH_RSSI_DUMMY_MARKER))
+-		rx_stats->rs_rssi = ATH_EP_RND(last_rssi,
+-					      ATH_RSSI_EP_MULTIPLIER);
+-	if (rx_stats->rs_rssi < 0)
+-		rx_stats->rs_rssi = 0;
++		rssi = ATH_EP_RND(last_rssi, ATH_RSSI_EP_MULTIPLIER);
++	if (rssi < 0)
++		rssi = 0;
+ 
+ 	/* Update Beacon RSSI, this is used by ANI. */
+-	ah->stats.avgbrssi = rx_stats->rs_rssi;
++	ah->stats.avgbrssi = rssi;
+ }
+ 
+ /*
+@@ -988,8 +987,6 @@ static int ath9k_rx_skb_preprocess(struc
+ {
+ 	struct ath_hw *ah = common->ah;
+ 
+-	memset(rx_status, 0, sizeof(struct ieee80211_rx_status));
+-
+ 	/*
+ 	 * everything but the rate is checked here, the rate check is done
+ 	 * separately to avoid doing two lookups for a rate for each frame.
+@@ -1011,6 +1008,8 @@ static int ath9k_rx_skb_preprocess(struc
+ 	rx_status->signal = ah->noise + rx_stats->rs_rssi;
+ 	rx_status->antenna = rx_stats->rs_antenna;
+ 	rx_status->flag |= RX_FLAG_MACTIME_MPDU;
++	if (rx_stats->rs_moreaggr)
++		rx_status->flag |= RX_FLAG_NO_SIGNAL_VAL;
+ 
+ 	return 0;
+ }
+@@ -1845,6 +1844,8 @@ int ath_rx_tasklet(struct ath_softc *sc,
+ 		if (sc->sc_flags & SC_OP_RXFLUSH)
+ 			goto requeue_drop_frag;
+ 
++		memset(rxs, 0, sizeof(struct ieee80211_rx_status));
++
+ 		rxs->mactime = (tsf & ~0xffffffffULL) | rs.rs_tstamp;
+ 		if (rs.rs_tstamp > tsf_lower &&
+ 		    unlikely(rs.rs_tstamp - tsf_lower > 0x10000000))
+--- a/drivers/net/wireless/ath/ath9k/beacon.c
++++ b/drivers/net/wireless/ath/ath9k/beacon.c
+@@ -91,7 +91,7 @@ static void ath_beacon_setup(struct ath_
+ 	info.txpower = MAX_RATE_POWER;
+ 	info.keyix = ATH9K_TXKEYIX_INVALID;
+ 	info.keytype = ATH9K_KEY_TYPE_CLEAR;
+-	info.flags = ATH9K_TXDESC_NOACK;
++	info.flags = ATH9K_TXDESC_NOACK | ATH9K_TXDESC_INTREQ;
+ 
+ 	info.buf_addr[0] = bf->bf_buf_addr;
+ 	info.buf_len[0] = roundup(skb->len, 4);
+@@ -355,7 +355,6 @@ void ath_beacon_tasklet(unsigned long da
+ 	struct ath_common *common = ath9k_hw_common(ah);
+ 	struct ath_buf *bf = NULL;
+ 	struct ieee80211_vif *vif;
+-	struct ath_tx_status ts;
+ 	bool edma = !!(ah->caps.hw_caps & ATH9K_HW_CAP_EDMA);
+ 	int slot;
+ 	u32 bfaddr, bc = 0;
+@@ -462,11 +461,6 @@ void ath_beacon_tasklet(unsigned long da
+ 			ath9k_hw_txstart(ah, sc->beacon.beaconq);
+ 
+ 		sc->beacon.ast_be_xmit += bc;     /* XXX per-vif? */
+-		if (edma) {
+-			spin_lock_bh(&sc->sc_pcu_lock);
+-			ath9k_hw_txprocdesc(ah, bf->bf_desc, (void *)&ts);
+-			spin_unlock_bh(&sc->sc_pcu_lock);
+-		}
+ 	}
+ }
+ 
+--- a/drivers/net/wireless/ath/ath9k/mac.c
++++ b/drivers/net/wireless/ath/ath9k/mac.c
+@@ -745,7 +745,11 @@ int ath9k_hw_beaconq_setup(struct ath_hw
+ 	qi.tqi_aifs = 1;
+ 	qi.tqi_cwmin = 0;
+ 	qi.tqi_cwmax = 0;
+-	/* NB: don't enable any interrupts */
++
++	if (ah->caps.hw_caps & ATH9K_HW_CAP_EDMA)
++		qi.tqi_qflags = TXQ_FLAG_TXOKINT_ENABLE |
++				TXQ_FLAG_TXERRINT_ENABLE;
++
+ 	return ath9k_hw_setuptxqueue(ah, ATH9K_TX_QUEUE_BEACON, &qi);
+ }
+ EXPORT_SYMBOL(ath9k_hw_beaconq_setup);
+--- a/drivers/net/wireless/ath/ath9k/main.c
++++ b/drivers/net/wireless/ath/ath9k/main.c
+@@ -118,13 +118,15 @@ void ath9k_ps_restore(struct ath_softc *
+ 	if (--sc->ps_usecount != 0)
+ 		goto unlock;
+ 
+-	if (sc->ps_idle && (sc->ps_flags & PS_WAIT_FOR_TX_ACK))
++	if (sc->ps_flags & PS_WAIT_FOR_TX_ACK)
++		goto unlock;
++
++	if (sc->ps_idle)
+ 		mode = ATH9K_PM_FULL_SLEEP;
+ 	else if (sc->ps_enabled &&
+ 		 !(sc->ps_flags & (PS_WAIT_FOR_BEACON |
+ 			      PS_WAIT_FOR_CAB |
+-			      PS_WAIT_FOR_PSPOLL_DATA |
+-			      PS_WAIT_FOR_TX_ACK)))
++			      PS_WAIT_FOR_PSPOLL_DATA)))
+ 		mode = ATH9K_PM_NETWORK_SLEEP;
+ 	else
+ 		goto unlock;
+@@ -1955,6 +1957,7 @@ static void ath9k_config_bss(struct ath_
+ 		sc->sc_flags &= ~SC_OP_ANI_RUN;
+ 		del_timer_sync(&common->ani.timer);
+ 		memset(&sc->caldata, 0, sizeof(sc->caldata));
++		ath9k_hw_ani_init(sc->sc_ah);
+ 	}
+ }
+ 
+@@ -2300,6 +2303,7 @@ static int ath9k_tx_last_beacon(struct i
+ 	struct ath_vif *avp;
+ 	struct ath_buf *bf;
+ 	struct ath_tx_status ts;
++	bool edma = !!(ah->caps.hw_caps & ATH9K_HW_CAP_EDMA);
+ 	int status;
+ 
+ 	vif = sc->beacon.bslot[0];
+@@ -2310,7 +2314,7 @@ static int ath9k_tx_last_beacon(struct i
+ 	if (!avp->is_bslot_active)
+ 		return 0;
+ 
+-	if (!sc->beacon.tx_processed) {
++	if (!sc->beacon.tx_processed && !edma) {
+ 		tasklet_disable(&sc->bcon_tasklet);
+ 
+ 		bf = avp->av_bcbuf;
+--- a/drivers/net/wireless/ath/ath9k/xmit.c
++++ b/drivers/net/wireless/ath/ath9k/xmit.c
+@@ -2296,9 +2296,12 @@ void ath_tx_edma_tasklet(struct ath_soft
+ 			break;
+ 		}
+ 
+-		/* Skip beacon completions */
+-		if (ts.qid == sc->beacon.beaconq)
++		/* Process beacon completions separately */
++		if (ts.qid == sc->beacon.beaconq) {
++			sc->beacon.tx_processed = true;
++			sc->beacon.tx_last = !(ts.ts_status & ATH9K_TXERR_MASK);
+ 			continue;
++		}
+ 
+ 		txq = &sc->tx.txq[ts.qid];
+ 
+--- a/drivers/net/wireless/ath/ath9k/ath9k.h
++++ b/drivers/net/wireless/ath/ath9k/ath9k.h
+@@ -299,7 +299,6 @@ struct ath_tx {
+ 
+ struct ath_rx_edma {
+ 	struct sk_buff_head rx_fifo;
+-	struct sk_buff_head rx_buffers;
+ 	u32 rx_fifo_hwsize;
+ };
+ 
+--- a/drivers/net/wireless/ath/ath9k/ani.c
++++ b/drivers/net/wireless/ath/ath9k/ani.c
+@@ -46,8 +46,8 @@ static const struct ani_ofdm_level_entry
+ 	{  5,  4,  1  }, /* lvl 5 */
+ 	{  6,  5,  1  }, /* lvl 6 */
+ 	{  7,  6,  1  }, /* lvl 7 */
+-	{  7,  7,  1  }, /* lvl 8 */
+-	{  7,  8,  0  }  /* lvl 9 */
++	{  7,  6,  0  }, /* lvl 8 */
++	{  7,  7,  0  }  /* lvl 9 */
+ };
+ #define ATH9K_ANI_OFDM_NUM_LEVEL \
+ 	ARRAY_SIZE(ofdm_level_table)
+@@ -91,8 +91,8 @@ static const struct ani_cck_level_entry 
+ 	{  4,  0  }, /* lvl 4 */
+ 	{  5,  0  }, /* lvl 5 */
+ 	{  6,  0  }, /* lvl 6 */
+-	{  7,  0  }, /* lvl 7 (only for high rssi) */
+-	{  8,  0  }  /* lvl 8 (only for high rssi) */
++	{  6,  0  }, /* lvl 7 (only for high rssi) */
++	{  7,  0  }  /* lvl 8 (only for high rssi) */
+ };
+ 
+ #define ATH9K_ANI_CCK_NUM_LEVEL \
+@@ -290,16 +290,9 @@ static void ath9k_hw_set_ofdm_nil(struct
+ 				     ATH9K_ANI_FIRSTEP_LEVEL,
+ 				     entry_ofdm->fir_step_level);
+ 
+-	if ((ah->opmode != NL80211_IFTYPE_STATION &&
+-	     ah->opmode != NL80211_IFTYPE_ADHOC) ||
+-	    aniState->noiseFloor <= aniState->rssiThrHigh) {
+-		if (aniState->ofdmWeakSigDetectOff)
+-			/* force on ofdm weak sig detect */
+-			ath9k_hw_ani_control(ah,
+-				ATH9K_ANI_OFDM_WEAK_SIGNAL_DETECTION,
+-					     true);
+-		else if (aniState->ofdmWeakSigDetectOff ==
+-			 entry_ofdm->ofdm_weak_signal_on)
++	if ((aniState->noiseFloor >= aniState->rssiThrHigh) &&
++	    (aniState->ofdmWeakSigDetectOff !=
++	     entry_ofdm->ofdm_weak_signal_on)) {
+ 			ath9k_hw_ani_control(ah,
+ 				ATH9K_ANI_OFDM_WEAK_SIGNAL_DETECTION,
+ 				entry_ofdm->ofdm_weak_signal_on);
+@@ -717,26 +710,30 @@ void ath9k_hw_ani_monitor(struct ath_hw 
+ 		ofdmPhyErrRate, aniState->cckNoiseImmunityLevel,
+ 		cckPhyErrRate, aniState->ofdmsTurn);
+ 
+-	if (aniState->listenTime > 5 * ah->aniperiod) {
+-		if (ofdmPhyErrRate <= ah->config.ofdm_trig_low &&
+-		    cckPhyErrRate <= ah->config.cck_trig_low) {
++	if (aniState->listenTime > ah->aniperiod) {
++		if (cckPhyErrRate < ah->config.cck_trig_low &&
++		    ((ofdmPhyErrRate < ah->config.ofdm_trig_low &&
++		      aniState->ofdmNoiseImmunityLevel <
++		      ATH9K_ANI_OFDM_DEF_LEVEL) ||
++		     (ofdmPhyErrRate < ATH9K_ANI_OFDM_TRIG_LOW_ABOVE_INI &&
++		      aniState->ofdmNoiseImmunityLevel >=
++		      ATH9K_ANI_OFDM_DEF_LEVEL))) {
+ 			ath9k_hw_ani_lower_immunity(ah);
+ 			aniState->ofdmsTurn = !aniState->ofdmsTurn;
+-		}
+-		ath9k_ani_restart(ah);
+-	} else if (aniState->listenTime > ah->aniperiod) {
+-		/* check to see if need to raise immunity */
+-		if (ofdmPhyErrRate > ah->config.ofdm_trig_high &&
+-		    (cckPhyErrRate <= ah->config.cck_trig_high ||
+-		     aniState->ofdmsTurn)) {
++		} else if ((ofdmPhyErrRate > ah->config.ofdm_trig_high &&
++			    aniState->ofdmNoiseImmunityLevel >=
++			    ATH9K_ANI_OFDM_DEF_LEVEL) ||
++			   (ofdmPhyErrRate >
++			    ATH9K_ANI_OFDM_TRIG_HIGH_BELOW_INI &&
++			    aniState->ofdmNoiseImmunityLevel <
++			    ATH9K_ANI_OFDM_DEF_LEVEL)) {
+ 			ath9k_hw_ani_ofdm_err_trigger(ah);
+-			ath9k_ani_restart(ah);
+ 			aniState->ofdmsTurn = false;
+ 		} else if (cckPhyErrRate > ah->config.cck_trig_high) {
+ 			ath9k_hw_ani_cck_err_trigger(ah);
+-			ath9k_ani_restart(ah);
+ 			aniState->ofdmsTurn = true;
+ 		}
++		ath9k_ani_restart(ah);
+ 	}
+ }
+ EXPORT_SYMBOL(ath9k_hw_ani_monitor);
+@@ -911,3 +908,4 @@ void ath9k_hw_ani_init(struct ath_hw *ah
+ 	ath9k_ani_restart(ah);
+ 	ath9k_enable_mib_counters(ah);
+ }
++EXPORT_SYMBOL(ath9k_hw_ani_init);
+--- a/drivers/net/wireless/ath/ath9k/ani.h
++++ b/drivers/net/wireless/ath/ath9k/ani.h
+@@ -25,11 +25,13 @@
+ 
+ /* units are errors per second */
+ #define ATH9K_ANI_OFDM_TRIG_HIGH_OLD      500
+-#define ATH9K_ANI_OFDM_TRIG_HIGH_NEW      1000
++#define ATH9K_ANI_OFDM_TRIG_HIGH_NEW      3500
++#define ATH9K_ANI_OFDM_TRIG_HIGH_BELOW_INI 1000
+ 
+ /* units are errors per second */
+ #define ATH9K_ANI_OFDM_TRIG_LOW_OLD       200
+ #define ATH9K_ANI_OFDM_TRIG_LOW_NEW       400
++#define ATH9K_ANI_OFDM_TRIG_LOW_ABOVE_INI 900
+ 
+ /* units are errors per second */
+ #define ATH9K_ANI_CCK_TRIG_HIGH_OLD       200
+@@ -53,7 +55,7 @@
+ #define ATH9K_ANI_RSSI_THR_LOW            7
+ 
+ #define ATH9K_ANI_PERIOD_OLD              100
+-#define ATH9K_ANI_PERIOD_NEW              1000
++#define ATH9K_ANI_PERIOD_NEW              300
+ 
+ /* in ms */
+ #define ATH9K_ANI_POLLINTERVAL_OLD        100
+--- a/drivers/net/wireless/ath/ath9k/ar5008_phy.c
++++ b/drivers/net/wireless/ath/ath9k/ar5008_phy.c
+@@ -1056,46 +1056,8 @@ static bool ar5008_hw_ani_control_old(st
+ 		break;
+ 	}
+ 	case ATH9K_ANI_OFDM_WEAK_SIGNAL_DETECTION:{
+-		static const int m1ThreshLow[] = { 127, 50 };
+-		static const int m2ThreshLow[] = { 127, 40 };
+-		static const int m1Thresh[] = { 127, 0x4d };
+-		static const int m2Thresh[] = { 127, 0x40 };
+-		static const int m2CountThr[] = { 31, 16 };
+-		static const int m2CountThrLow[] = { 63, 48 };
+ 		u32 on = param ? 1 : 0;
+ 
+-		REG_RMW_FIELD(ah, AR_PHY_SFCORR_LOW,
+-			      AR_PHY_SFCORR_LOW_M1_THRESH_LOW,
+-			      m1ThreshLow[on]);
+-		REG_RMW_FIELD(ah, AR_PHY_SFCORR_LOW,
+-			      AR_PHY_SFCORR_LOW_M2_THRESH_LOW,
+-			      m2ThreshLow[on]);
+-		REG_RMW_FIELD(ah, AR_PHY_SFCORR,
+-			      AR_PHY_SFCORR_M1_THRESH,
+-			      m1Thresh[on]);
+-		REG_RMW_FIELD(ah, AR_PHY_SFCORR,
+-			      AR_PHY_SFCORR_M2_THRESH,
+-			      m2Thresh[on]);
+-		REG_RMW_FIELD(ah, AR_PHY_SFCORR,
+-			      AR_PHY_SFCORR_M2COUNT_THR,
+-			      m2CountThr[on]);
+-		REG_RMW_FIELD(ah, AR_PHY_SFCORR_LOW,
+-			      AR_PHY_SFCORR_LOW_M2COUNT_THR_LOW,
+-			      m2CountThrLow[on]);
+-
+-		REG_RMW_FIELD(ah, AR_PHY_SFCORR_EXT,
+-			      AR_PHY_SFCORR_EXT_M1_THRESH_LOW,
+-			      m1ThreshLow[on]);
+-		REG_RMW_FIELD(ah, AR_PHY_SFCORR_EXT,
+-			      AR_PHY_SFCORR_EXT_M2_THRESH_LOW,
+-			      m2ThreshLow[on]);
+-		REG_RMW_FIELD(ah, AR_PHY_SFCORR_EXT,
+-			      AR_PHY_SFCORR_EXT_M1_THRESH,
+-			      m1Thresh[on]);
+-		REG_RMW_FIELD(ah, AR_PHY_SFCORR_EXT,
+-			      AR_PHY_SFCORR_EXT_M2_THRESH,
+-			      m2Thresh[on]);
+-
+ 		if (on)
+ 			REG_SET_BIT(ah, AR_PHY_SFCORR_LOW,
+ 				    AR_PHY_SFCORR_LOW_USE_SELF_CORR_LOW);
+--- a/drivers/net/wireless/ath/ath9k/ar9003_phy.c
++++ b/drivers/net/wireless/ath/ath9k/ar9003_phy.c
+@@ -824,55 +824,6 @@ static bool ar9003_hw_ani_control(struct
+ 		 * on == 0 means more noise imm
+ 		 */
+ 		u32 on = param ? 1 : 0;
+-		/*
+-		 * make register setting for default
+-		 * (weak sig detect ON) come from INI file
+-		 */
+-		int m1ThreshLow = on ?
+-			aniState->iniDef.m1ThreshLow : m1ThreshLow_off;
+-		int m2ThreshLow = on ?
+-			aniState->iniDef.m2ThreshLow : m2ThreshLow_off;
+-		int m1Thresh = on ?
+-			aniState->iniDef.m1Thresh : m1Thresh_off;
+-		int m2Thresh = on ?
+-			aniState->iniDef.m2Thresh : m2Thresh_off;
+-		int m2CountThr = on ?
+-			aniState->iniDef.m2CountThr : m2CountThr_off;
+-		int m2CountThrLow = on ?
+-			aniState->iniDef.m2CountThrLow : m2CountThrLow_off;
+-		int m1ThreshLowExt = on ?
+-			aniState->iniDef.m1ThreshLowExt : m1ThreshLowExt_off;
+-		int m2ThreshLowExt = on ?
+-			aniState->iniDef.m2ThreshLowExt : m2ThreshLowExt_off;
+-		int m1ThreshExt = on ?
+-			aniState->iniDef.m1ThreshExt : m1ThreshExt_off;
+-		int m2ThreshExt = on ?
+-			aniState->iniDef.m2ThreshExt : m2ThreshExt_off;
+-
+-		REG_RMW_FIELD(ah, AR_PHY_SFCORR_LOW,
+-			      AR_PHY_SFCORR_LOW_M1_THRESH_LOW,
+-			      m1ThreshLow);
+-		REG_RMW_FIELD(ah, AR_PHY_SFCORR_LOW,
+-			      AR_PHY_SFCORR_LOW_M2_THRESH_LOW,
+-			      m2ThreshLow);
+-		REG_RMW_FIELD(ah, AR_PHY_SFCORR,
+-			      AR_PHY_SFCORR_M1_THRESH, m1Thresh);
+-		REG_RMW_FIELD(ah, AR_PHY_SFCORR,
+-			      AR_PHY_SFCORR_M2_THRESH, m2Thresh);
+-		REG_RMW_FIELD(ah, AR_PHY_SFCORR,
+-			      AR_PHY_SFCORR_M2COUNT_THR, m2CountThr);
+-		REG_RMW_FIELD(ah, AR_PHY_SFCORR_LOW,
+-			      AR_PHY_SFCORR_LOW_M2COUNT_THR_LOW,
+-			      m2CountThrLow);
+-
+-		REG_RMW_FIELD(ah, AR_PHY_SFCORR_EXT,
+-			      AR_PHY_SFCORR_EXT_M1_THRESH_LOW, m1ThreshLowExt);
+-		REG_RMW_FIELD(ah, AR_PHY_SFCORR_EXT,
+-			      AR_PHY_SFCORR_EXT_M2_THRESH_LOW, m2ThreshLowExt);
+-		REG_RMW_FIELD(ah, AR_PHY_SFCORR_EXT,
+-			      AR_PHY_SFCORR_EXT_M1_THRESH, m1ThreshExt);
+-		REG_RMW_FIELD(ah, AR_PHY_SFCORR_EXT,
+-			      AR_PHY_SFCORR_EXT_M2_THRESH, m2ThreshExt);
+ 
+ 		if (on)
+ 			REG_SET_BIT(ah, AR_PHY_SFCORR_LOW,
+--- a/drivers/net/wireless/rt2x00/rt2x00dev.c
++++ b/drivers/net/wireless/rt2x00/rt2x00dev.c
+@@ -430,10 +430,14 @@ void rt2x00lib_txdone(struct queue_entry
+ 	/*
+ 	 * If the data queue was below the threshold before the txdone
+ 	 * handler we must make sure the packet queue in the mac80211 stack
+-	 * is reenabled when the txdone handler has finished.
++	 * is reenabled when the txdone handler has finished. This has to be
++	 * serialized with rt2x00mac_tx(), otherwise we can wake up queue
++	 * before it was stopped.
+ 	 */
++	spin_lock_bh(&entry->queue->tx_lock);
+ 	if (!rt2x00queue_threshold(entry->queue))
+ 		rt2x00queue_unpause_queue(entry->queue);
++	spin_unlock_bh(&entry->queue->tx_lock);
+ }
+ EXPORT_SYMBOL_GPL(rt2x00lib_txdone);
+ 
+--- a/drivers/net/wireless/rt2x00/rt2x00mac.c
++++ b/drivers/net/wireless/rt2x00/rt2x00mac.c
+@@ -152,13 +152,22 @@ void rt2x00mac_tx(struct ieee80211_hw *h
+ 	if (unlikely(rt2x00queue_write_tx_frame(queue, skb, false)))
+ 		goto exit_fail;
+ 
++	/*
++	 * Pausing queue has to be serialized with rt2x00lib_txdone(). Note
++	 * we should not use spin_lock_bh variant as bottom halve was already
++	 * disabled before ieee80211_xmit() call.
++	 */
++	spin_lock(&queue->tx_lock);
+ 	if (rt2x00queue_threshold(queue))
+ 		rt2x00queue_pause_queue(queue);
++	spin_unlock(&queue->tx_lock);
+ 
+ 	return;
+ 
+  exit_fail:
++	spin_lock(&queue->tx_lock);
+ 	rt2x00queue_pause_queue(queue);
++	spin_unlock(&queue->tx_lock);
+  exit_free_skb:
+ 	ieee80211_free_txskb(hw, skb);
+ }
+--- a/drivers/net/wireless/rt2x00/rt2x00queue.c
++++ b/drivers/net/wireless/rt2x00/rt2x00queue.c
+@@ -619,6 +619,9 @@ int rt2x00queue_write_tx_frame(struct da
+ 	else if (test_bit(REQUIRE_DMA, &queue->rt2x00dev->cap_flags))
+ 		rt2x00queue_align_frame(skb);
+ 
++	/*
++	 * That function must be called with bh disabled.
++	 */
+ 	spin_lock(&queue->tx_lock);
+ 
+ 	if (unlikely(rt2x00queue_full(queue))) {

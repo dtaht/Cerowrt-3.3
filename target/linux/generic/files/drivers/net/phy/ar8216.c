@@ -29,6 +29,7 @@
 #include <linux/phy.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
+#include <linux/lockdep.h>
 #include "ar8216.h"
 
 /* size of the vlan table */
@@ -86,7 +87,7 @@ ar8216_mii_read(struct ar8216_priv *priv, int reg)
 	mutex_lock(&bus->mdio_lock);
 
 	bus->write(bus, 0x18, 0, page);
-	msleep(1); /* wait for the page switch to propagate */
+	usleep_range(1000, 2000); /* wait for the page switch to propagate */
 	lo = bus->read(bus, 0x10 | r2, r1);
 	hi = bus->read(bus, 0x10 | r2, r1 + 1);
 
@@ -110,10 +111,22 @@ ar8216_mii_write(struct ar8216_priv *priv, int reg, u32 val)
 	mutex_lock(&bus->mdio_lock);
 
 	bus->write(bus, 0x18, 0, r3);
-	msleep(1); /* wait for the page switch to propagate */
+	usleep_range(1000, 2000); /* wait for the page switch to propagate */
 	bus->write(bus, 0x10 | r2, r1 + 1, hi);
 	bus->write(bus, 0x10 | r2, r1, lo);
 
+	mutex_unlock(&bus->mdio_lock);
+}
+
+static void
+ar8216_phy_dbg_write(struct ar8216_priv *priv, int phy_addr,
+		     u16 dbg_addr, u16 dbg_data)
+{
+	struct mii_bus *bus = priv->phy->bus;
+
+	mutex_lock(&bus->mdio_lock);
+	bus->write(bus, phy_addr, MII_ATH_DBG_ADDR, dbg_addr);
+	bus->write(bus, phy_addr, MII_ATH_DBG_DATA, dbg_data);
 	mutex_unlock(&bus->mdio_lock);
 }
 
@@ -121,6 +134,8 @@ static u32
 ar8216_rmw(struct ar8216_priv *priv, int reg, u32 mask, u32 val)
 {
 	u32 v;
+
+	lockdep_assert_held(&priv->reg_mutex);
 
 	v = priv->read(priv, reg);
 	v &= ~mask;
@@ -716,14 +731,11 @@ ar8316_hw_init(struct ar8216_priv *priv)
 		if ((i == 4) && priv->port4_phy &&
 		    priv->phy->interface == PHY_INTERFACE_MODE_RGMII) {
 			/* work around for phy4 rgmii mode */
-			mdiobus_write(bus, i, MII_ATH_DBG_ADDR, 0x12);
-			mdiobus_write(bus, i, MII_ATH_DBG_DATA, 0x480c);
+			ar8216_phy_dbg_write(priv, i, 0x12, 0x480c);
 			/* rx delay */
-			mdiobus_write(bus, i, MII_ATH_DBG_ADDR, 0x0);
-			mdiobus_write(bus, i, MII_ATH_DBG_DATA, 0x824e);
+			ar8216_phy_dbg_write(priv, i, 0x0, 0x824e);
 			/* tx delay */
-			mdiobus_write(bus, i, MII_ATH_DBG_ADDR, 0x5);
-			mdiobus_write(bus, i, MII_ATH_DBG_DATA, 0x3d47);
+			ar8216_phy_dbg_write(priv, i, 0x5, 0x3d47);
 			msleep(1000);
 		}
 

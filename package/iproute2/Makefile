@@ -8,13 +8,13 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=iproute2
-PKG_VERSION:=3.3.01git
+PKG_VERSION:=3.3.02git
 PKG_RELEASE:=1
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=git://git.kernel.org/pub/scm/linux/kernel/git/shemminger/iproute2.git
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
-PKG_SOURCE_VERSION:=8ced4fcd50dbbf7a0219ff5705390e6f89ba434c
+PKG_SOURCE_VERSION:=598a42c09153a1b6cfe03efa3f7e68773eec912d
 PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
 
 #PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz

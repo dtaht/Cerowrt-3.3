@@ -1,0 +1,13 @@
+diff --git a/misc/Makefile b/misc/Makefile
+index a59ff87..ee487ad 100644
+--- a/misc/Makefile
++++ b/misc/Makefile
+@@ -1,7 +1,7 @@
+ SSOBJ=ss.o ssfilter.o
+ LNSTATOBJ=lnstat.o lnstat_util.o
+ 
+-TARGETS=ss nstat ifstat rtacct arpd lnstat
++TARGETS=ss nstat ifstat rtacct 
+ 
+ include ../Config
+ 

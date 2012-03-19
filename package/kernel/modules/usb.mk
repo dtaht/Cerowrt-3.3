@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2006-2011 OpenWrt.org
+# Copyright (C) 2006-2012 OpenWrt.org
 #
 # This is free software, licensed under the GNU General Public License v2.
 # See /LICENSE for more information.
@@ -606,6 +606,20 @@ endef
 $(eval $(call KernelPackage,usb-serial-option))
 
 
+define KernelPackage/usb-serial-qualcomm
+  TITLE:=Support for Qualcomm USB serial
+  KCONFIG:=CONFIG_USB_SERIAL_QUALCOMM
+  FILES:=$(LINUX_DIR)/drivers/usb/serial/qcserial.ko
+  AUTOLOAD:=$(call AutoLoad,65,qcserial)
+endef
+
+define KernelPackage/usb-serial-qualcomm/description
+ Kernel support for Qualcomm USB Serial devices (Gobi)
+endef
+
+$(eval $(call KernelPackage,usb-serial-qualcomm))
+
+
 define KernelPackage/usb-storage
   TITLE:=USB Storage support
   DEPENDS:= +kmod-scsi-core
@@ -897,6 +911,21 @@ define KernelPackage/usb-net-sierrawireless/description
 endef
 
 $(eval $(call KernelPackage,usb-net-sierrawireless))
+
+
+define KernelPackage/usb-net-ipheth
+  TITLE:=Apple iPhone USB Ethernet driver
+  KCONFIG:=CONFIG_USB_IPHETH
+  FILES:=$(LINUX_DIR)/drivers/net/usb/ipheth.ko
+  AUTOLOAD:=$(call AutoLoad,64,ipheth)
+  $(call AddDepends/usb-net)
+endef
+
+define KernelPackage/usb-net-ipheth/description
+ Kernel support for Apple iPhone USB Ethernet driver
+endef
+
+$(eval $(call KernelPackage,usb-net-ipheth))
 
 
 define KernelPackage/usb-hid

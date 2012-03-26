@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2006-2011 OpenWrt.org
+# Copyright (C) 2006-2012 OpenWrt.org
 #
 # This is free software, licensed under the GNU General Public License v2.
 # See /LICENSE for more information.
@@ -8,13 +8,13 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=dnsmasq
-PKG_VERSION:=2.60-1-6-git
+PKG_VERSION:=2.60-1-7-git
 PKG_RELEASE:=2
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=git://thekelleys.org.uk/dnsmasq.git
 PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
-PKG_SOURCE_VERSION:=353ae4d2707f51ad5e708aed39de9700f0311096
+PKG_SOURCE_VERSION:=30cd96663fb0d20032ecd3bd443fbb64b6356f90
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION)-$(PKG_SOURCE_VERSION).tar.gz
 
 #PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz

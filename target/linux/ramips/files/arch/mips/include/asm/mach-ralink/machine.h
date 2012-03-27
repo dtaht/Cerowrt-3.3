@@ -25,9 +25,11 @@ enum ramips_mach_type {
 	RAMIPS_MACH_DIR_300_B1,		/* D-Link DIR-300 B1 */
 	RAMIPS_MACH_DIR_600_B1,		/* D-Link DIR-600 B1 */
 	RAMIPS_MACH_DIR_600_B2,		/* D-Link DIR-600 B2 */
+	RAMIPS_MACH_DIR_615_D,		/* D-Link DIR-615 D */
 	RAMIPS_MACH_RT_G32_B1,		/* Asus RT-G32 B1 */
 	RAMIPS_MACH_RT_N10_PLUS,	/* Asus RT-N10+ */
 	RAMIPS_MACH_NW718,		/* Netcore NW718 */
+	RAMIPS_MACH_WL_330N,		/* Asus WL-330N */
 
 	/* RT3052 based machines */
 	RAMIPS_MACH_ARGUS_ATP52B,	/* Argus ATP-52B */

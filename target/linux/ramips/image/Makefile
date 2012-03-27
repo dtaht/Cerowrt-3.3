@@ -312,6 +312,7 @@ define Image/Build/Profile/DIR300B1
 	$(call Image/Build/Template/$(fs_squash)/$(1),DIR300B1,dir-300-b1,DIR-300-B1,wrgn23_dlwbr_dir300b)
 	$(call Image/Build/Template/$(fs_squash)/$(1),DIR300B1,dir-600-b1,DIR-600-B1,wrgn23_dlwbr_dir600b)
 	$(call Image/Build/Template/$(fs_squash)/$(1),DIR300B1,dir-600-b2,DIR-600-B2,wrgn23_dlwbr_dir600b)
+	$(call Image/Build/Template/$(fs_squash)/$(1),DIR300B1,dir-615-d,DIR-615-D,wrgn23_dlwbr_dir615d)
 endef
 
 define Image/Build/Profile/ESR9753
@@ -378,6 +379,10 @@ define Image/Build/Profile/WHRG300N
 	$(call Image/Build/Template/$(fs_squashfs)/$(1),WHRG300N)
 endef
 
+define Image/Build/Profile/WL_330N
+	$(call Image/Build/Template/$(fs_squash)/$(1),GENERIC_4M,wl-330n,WL_330N,ttyS1,57600,spi)
+endef
+
 define Image/Build/Profile/WL341V3
 	$(call Image/Build/Template/$(fs_squash)/$(1),WL341V3,wl341v3,WL341V3)
 endef
@@ -421,6 +426,7 @@ define Image/Build/Profile/Default
 	$(call Image/Build/Profile/W502U,$(1))
 	$(call Image/Build/Profile/WCR150GN,$(1))
 	$(call Image/Build/Profile/WHRG300N,$(1))
+	$(call Image/Build/Profile/WL_330N,$(1))
 	$(call Image/Build/Profile/WL341V3,$(1))
 	$(call Image/Build/Profile/WL351,$(1))
 	$(call Image/Build/Profile/WR5123GN,$(1))

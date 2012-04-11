@@ -1,0 +1,51 @@
+From patchwork Fri Apr  6 08:49:10 2012
+Content-Type: text/plain; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Subject: net: fix a race in sock_queue_err_skb()
+Date: Thu, 05 Apr 2012 22:49:10 -0000
+From: Eric Dumazet <eric.dumazet@gmail.com>
+X-Patchwork-Id: 151108
+Message-Id: <1333702150.5312.23.camel@edumazet-glaptop>
+To: David Miller <davem@davemloft.net>
+Cc: netdev <netdev@vger.kernel.org>
+
+As soon as an skb is queued into socket error queue, another thread
+can consume it, so we are not allowed to reference skb anymore, or risk
+use after free.
+
+Signed-off-by: Eric Dumazet <eric.dumazet@gmail.com>
+
+---
+net/core/skbuff.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+
+
+--
+To unsubscribe from this list: send the line "unsubscribe netdev" in
+the body of a message to majordomo@vger.kernel.org
+More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+diff --git a/net/core/skbuff.c b/net/core/skbuff.c
+index f223cdc..baf8d28 100644
+--- a/net/core/skbuff.c
++++ b/net/core/skbuff.c
+@@ -3161,6 +3161,8 @@ static void sock_rmem_free(struct sk_buff *skb)
+  */
+ int sock_queue_err_skb(struct sock *sk, struct sk_buff *skb)
+ {
++	int len = skb->len;
++
+ 	if (atomic_read(&sk->sk_rmem_alloc) + skb->truesize >=
+ 	    (unsigned)sk->sk_rcvbuf)
+ 		return -ENOMEM;
+@@ -3175,7 +3177,7 @@ int sock_queue_err_skb(struct sock *sk, struct sk_buff *skb)
+ 
+ 	skb_queue_tail(&sk->sk_error_queue, skb);
+ 	if (!sock_flag(sk, SOCK_DEAD))
+-		sk->sk_data_ready(sk, skb->len);
++		sk->sk_data_ready(sk, len);
+ 	return 0;
+ }
+ EXPORT_SYMBOL(sock_queue_err_skb);

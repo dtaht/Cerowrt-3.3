@@ -1,3 +1,22 @@
+From 163277fd26e199089fd34295010de5c80343c584 Mon Sep 17 00:00:00 2001
+From: dtaht <dtaht@carme.lab.bufferbloat.net>
+Date: Thu, 12 Apr 2012 07:21:05 -0700
+Subject: [PATCH 2/3] Unaligned Access Hacks for ar71xx Architecture
+
+Felix's unaligned access hacks which dramatically improve performance
+of the mis-wired ethernet chip on the ar71xx architecture,
+under ipv4, mostly.
+---
+ arch/mips/include/asm/checksum.h               |   27 ++++++++++++++---------
+ include/linux/ip.h                             |    2 +-
+ include/linux/ipv6.h                           |    2 +-
+ include/linux/tcp.h                            |    2 +-
+ include/linux/udp.h                            |    2 +-
+ net/ipv4/netfilter/nf_conntrack_l3proto_ipv4.c |    5 ++-
+ 6 files changed, 23 insertions(+), 17 deletions(-)
+
+diff --git a/arch/mips/include/asm/checksum.h b/arch/mips/include/asm/checksum.h
+index f2f7c6c..9be4201 100644
 --- a/arch/mips/include/asm/checksum.h
 +++ b/arch/mips/include/asm/checksum.h
 @@ -12,6 +12,7 @@
@@ -8,7 +27,7 @@
  
  #include <asm/uaccess.h>
  
-@@ -104,26 +105,30 @@ static inline __sum16 ip_fast_csum(const
+@@ -104,26 +105,30 @@ static inline __sum16 ip_fast_csum(const void *iph, unsigned int ihl)
  	const unsigned int *stop = word + ihl;
  	unsigned int csum;
  	int carry;
@@ -50,6 +69,8 @@
  	} while (word != stop);
  
  	return csum_fold(csum);
+diff --git a/include/linux/ip.h b/include/linux/ip.h
+index bd0a2a8..7a3f2d3 100644
 --- a/include/linux/ip.h
 +++ b/include/linux/ip.h
 @@ -102,7 +102,7 @@ struct iphdr {
@@ -61,6 +82,8 @@
  
  #ifdef __KERNEL__
  #include <linux/skbuff.h>
+diff --git a/include/linux/ipv6.h b/include/linux/ipv6.h
+index 6318268..fdada3e 100644
 --- a/include/linux/ipv6.h
 +++ b/include/linux/ipv6.h
 @@ -126,7 +126,7 @@ struct ipv6hdr {
@@ -72,6 +95,8 @@
  
  #ifdef __KERNEL__
  /*
+diff --git a/include/linux/tcp.h b/include/linux/tcp.h
+index 3c7ffdb..e48536a 100644
 --- a/include/linux/tcp.h
 +++ b/include/linux/tcp.h
 @@ -54,7 +54,7 @@ struct tcphdr {
@@ -83,6 +108,8 @@
  
  /*
   *	The union cast uses a gcc extension to avoid aliasing problems
+diff --git a/include/linux/udp.h b/include/linux/udp.h
+index 03f72a2..ea34ce7 100644
 --- a/include/linux/udp.h
 +++ b/include/linux/udp.h
 @@ -24,7 +24,7 @@ struct udphdr {
@@ -94,6 +121,8 @@
  
  /* UDP socket options */
  #define UDP_CORK	1	/* Never send partially complete segments */
+diff --git a/net/ipv4/netfilter/nf_conntrack_l3proto_ipv4.c b/net/ipv4/netfilter/nf_conntrack_l3proto_ipv4.c
+index de9da21..2704407 100644
 --- a/net/ipv4/netfilter/nf_conntrack_l3proto_ipv4.c
 +++ b/net/ipv4/netfilter/nf_conntrack_l3proto_ipv4.c
 @@ -14,6 +14,7 @@
@@ -104,7 +133,7 @@
  #include <net/route.h>
  #include <net/ip.h>
  
-@@ -44,8 +45,8 @@ static bool ipv4_pkt_to_tuple(const stru
+@@ -44,8 +45,8 @@ static bool ipv4_pkt_to_tuple(const struct sk_buff *skb, unsigned int nhoff,
  	if (ap == NULL)
  		return false;
  
@@ -115,3 +144,6 @@
  
  	return true;
  }
+-- 
+1.7.5.4
+

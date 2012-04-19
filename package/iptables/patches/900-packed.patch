@@ -1,0 +1,28 @@
+diff --git a/include/iptables.h b/include/iptables.h
+index c42613c..4ae9298 100644
+--- a/include/iptables.h
++++ b/include/iptables.h
+@@ -5,6 +5,9 @@
+ #include <xtables.h>
+ #include <libiptc/libiptc.h>
+ #include <iptables/internal.h>
++#ifndef __packed
++#define  __packed __attribute__((packed))
++#endif
+ 
+ /* Your shared library should call one of these. */
+ extern int do_command4(int argc, char *argv[], char **table,
+diff --git a/include/xtables.h.in b/include/xtables.h.in
+index 28e2933..03081bb 100644
+--- a/include/xtables.h.in
++++ b/include/xtables.h.in
+@@ -5,6 +5,9 @@
+  * Changing any structs/functions may incur a needed change
+  * in libxtables_vcurrent/vage too.
+  */
++#ifndef __packed
++#define __packed __attribute__((packed))
++#endif
+ 
+ #include <sys/socket.h> /* PF_* */
+ #include <sys/types.h>

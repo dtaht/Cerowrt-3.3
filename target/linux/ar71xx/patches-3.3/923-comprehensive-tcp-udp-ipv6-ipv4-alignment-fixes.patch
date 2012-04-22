@@ -94,6 +94,19 @@ index ba45e6b..5bb0258 100644
  
  #ifdef __KERNEL__
  #include <linux/skbuff.h>
+diff --git a/include/linux/if_vlan.h b/include/linux/if_vlan.h
+index 13aff1e..add341d 100644
+--- a/include/linux/if_vlan.h
++++ b/include/linux/if_vlan.h
+@@ -39,7 +39,7 @@
+ struct vlan_hdr {
+ 	__be16	h_vlan_TCI;
+ 	__be16	h_vlan_encapsulated_proto;
+-};
++} __packed;
+ 
+ /**
+  *	struct vlan_ethhdr - vlan ethernet header (ethhdr + vlan_hdr)
 diff --git a/include/linux/igmp.h b/include/linux/igmp.h
 index 82de336..a17b50c 100644
 --- a/include/linux/igmp.h
@@ -278,6 +291,22 @@ index 80461c1..ffd6fbd 100644
  
  extern bool skb_flow_dissect(const struct sk_buff *skb, struct flow_keys *flow);
  #endif
+diff --git a/include/net/ip6_checksum.h b/include/net/ip6_checksum.h
+index bc1b0fd..caef125 100644
+--- a/include/net/ip6_checksum.h
++++ b/include/net/ip6_checksum.h
+@@ -45,6 +45,11 @@ static __inline__ __sum16 csum_ipv6_magic(const struct in6_addr *saddr,
+ 	__u32 uproto;
+ 	__u32 sum = (__force u32)csum;
+ 
++#ifdef _HAVE_ARCH_IPV6_CSUM_ALIGNED
++       if (((((unsigned int) saddr | (unsigned int) daddr)) & 3) == 0)
++               return csum_ipv6_magic_aligned(saddr,daddr,len,proto,csum);
++#endif
++
+ 	sum += (__force u32)saddr->s6_addr32[0];
+ 	carry = (sum < (__force u32)saddr->s6_addr32[0]);
+ 	sum += carry;
 diff --git a/include/net/ndisc.h b/include/net/ndisc.h
 index a9d350e..5be936d 100644
 --- a/include/net/ndisc.h
@@ -304,6 +333,52 @@ index a9d350e..5be936d 100644
  
  struct nd_opt_hdr {
  	__u8		nd_opt_type;
+diff --git a/net/core/flow_dissector.c b/net/core/flow_dissector.c
+index a225089..019970f 100644
+--- a/net/core/flow_dissector.c
++++ b/net/core/flow_dissector.c
+@@ -17,7 +17,10 @@ static void iph_to_flow_copy_addrs(struct flow_keys *flow, const struct iphdr *i
+ {
+ 	BUILD_BUG_ON(offsetof(typeof(*flow), dst) !=
+ 		     offsetof(typeof(*flow), src) + sizeof(flow->src));
+-	memcpy(&flow->src, &iph->saddr, sizeof(flow->src) + sizeof(flow->dst));
++	/*	memcpy(&flow->src, &iph->saddr, sizeof(flow->src) + sizeof(flow->dst)); */
++	flow->src = iph->saddr;
++	flow->dst = iph->daddr;
++
+ }
+ 
+ bool skb_flow_dissect(const struct sk_buff *skb, struct flow_keys *flow)
+@@ -136,7 +139,7 @@ ipv6:
+ 		nhoff += poff;
+ 		ports = skb_header_pointer(skb, nhoff, sizeof(_ports), &_ports);
+ 		if (ports)
+-			flow->ports = *ports;
++		  flow->ports = __get_unaligned_cpu32(ports);
+ 	}
+ 
+ 	return true;
+diff --git a/net/core/secure_seq.c b/net/core/secure_seq.c
+index 99b2596..2127551 100644
+--- a/net/core/secure_seq.c
++++ b/net/core/secure_seq.c
+@@ -7,6 +7,7 @@
+ #include <linux/hrtimer.h>
+ #include <linux/ktime.h>
+ #include <linux/string.h>
++#include <linux/unaligned/packed_struct.h>
+ 
+ #include <net/secure_seq.h>
+ 
+@@ -46,7 +47,7 @@ __u32 secure_tcpv6_sequence_number(const __be32 *saddr, const __be32 *daddr,
+ 
+ 	memcpy(hash, saddr, 16);
+ 	for (i = 0; i < 4; i++)
+-		secret[i] = net_secret[i] + (__force u32)daddr[i];
++	  secret[i] = net_secret[i] + (__force u32) __get_unaligned_cpu32(&daddr[i]);
+ 	secret[4] = net_secret[4] +
+ 		(((__force u16)sport << 16) + (__force u16)dport);
+ 	for (i = 5; i < MD5_MESSAGE_BYTES / 4; i++)
 diff --git a/net/ipv4/netfilter/nf_conntrack_l3proto_ipv4.c b/net/ipv4/netfilter/nf_conntrack_l3proto_ipv4.c
 index de9da21..2704407 100644
 --- a/net/ipv4/netfilter/nf_conntrack_l3proto_ipv4.c

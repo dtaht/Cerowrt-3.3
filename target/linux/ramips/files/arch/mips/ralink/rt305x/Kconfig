@@ -36,6 +36,11 @@ config RT305X_MACH_WL_330N
 	select RALINK_DEV_GPIO_BUTTONS
 	select RALINK_DEV_GPIO_LEDS
 
+config RT305X_MACH_WL_330N3G
+	bool "Asus WL-330N3G board support"
+	select RALINK_DEV_GPIO_BUTTONS
+	select RALINK_DEV_GPIO_LEDS
+
 config RT305X_MACH_HW550_3G
 	bool "Aztech HW550-3G support"
 	select RALINK_DEV_GPIO_BUTTONS
@@ -79,6 +84,11 @@ config RT305X_MACH_WR512_3GN
 	select RALINK_DEV_GPIO_BUTTONS
 	select RALINK_DEV_GPIO_LEDS
 
+config RT305X_MACH_UR_336UN
+	bool "UR-336UN Wireless N router"
+	select RALINK_DEV_GPIO_BUTTONS
+	select RALINK_DEV_GPIO_LEDS
+
 config RT305X_MACH_NW718
 	bool "Netcore NW718"
 	select RALINK_DEV_GPIO_BUTTONS
@@ -101,6 +111,11 @@ config RT305X_MACH_PWH2004
 
 config RT305X_MACH_V22RW_2X2
 	bool "Ralink AP-RT3052-V22RW-2X2 board support"
+	select RALINK_DEV_GPIO_BUTTONS
+	select RALINK_DEV_GPIO_LEDS
+
+config RT305X_MACH_W306R_V20
+	bool "Tenda W306R V2.0 board support"
 	select RALINK_DEV_GPIO_BUTTONS
 	select RALINK_DEV_GPIO_LEDS
 

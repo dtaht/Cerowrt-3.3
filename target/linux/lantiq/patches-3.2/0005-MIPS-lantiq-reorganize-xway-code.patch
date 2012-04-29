@@ -1,7 +1,7 @@
-From cf7086d4c2f7caeccd019c0a57bf1566c72c13ee Mon Sep 17 00:00:00 2001
+From 222ee25fab35b3c3a4c63903b6af4eb0d0556750 Mon Sep 17 00:00:00 2001
 From: John Crispin <blogic@openwrt.org>
 Date: Wed, 10 Aug 2011 14:57:04 +0200
-Subject: [PATCH 05/70] MIPS: lantiq: reorganize xway code
+Subject: [PATCH 05/73] MIPS: lantiq: reorganize xway code
 
 Inside the folder arch/mips/lantiq/xway, there were alot of small files with
 lots of duplicated code. This patch adds a wrapper function for inserting and

@@ -96,6 +96,8 @@ endef
 define Package/tc/install
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/tc/tc $(1)/usr/sbin/
+	$(INSTALL_DIR) $(1)/etc/hotplug.d/iface
+	$(INSTALL_BIN) ./files/30-teql $(1)/etc/hotplug.d/iface/
 endef
 
 define Package/genl/install

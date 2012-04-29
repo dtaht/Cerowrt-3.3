@@ -1,7 +1,7 @@
-From c68f8bdcd4c58a0c1d92e20230a943e8089d865a Mon Sep 17 00:00:00 2001
+From ae4a7211739412c5f9ddd85d1437cab182fe428f Mon Sep 17 00:00:00 2001
 From: John Crispin <blogic@openwrt.org>
 Date: Thu, 10 Nov 2011 19:32:37 +0100
-Subject: [PATCH 16/70] MAINTAINERS: add entry for Lantiq related files
+Subject: [PATCH 16/73] MAINTAINERS: add entry for Lantiq related files
 
 Adds new entry to MAINTAINERS file for Lantiq SoC related code.
 

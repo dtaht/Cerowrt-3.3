@@ -1,7 +1,7 @@
-From 68e9e86dda22c491e5e3c44271a91aefcf636434 Mon Sep 17 00:00:00 2001
+From 993160b530efe9b0d3f0bc4551954a4c3344beeb Mon Sep 17 00:00:00 2001
 From: John Crispin <blogic@openwrt.org>
 Date: Sat, 20 Aug 2011 18:55:13 +0200
-Subject: [PATCH 11/70] MIPS: lantiq: fix early printk
+Subject: [PATCH 11/73] MIPS: lantiq: fix early printk
 
 The code was using a 32bit write operations in the early_printk code. This
 resulted in 3 zero bytes also being written to the serial port. This patch

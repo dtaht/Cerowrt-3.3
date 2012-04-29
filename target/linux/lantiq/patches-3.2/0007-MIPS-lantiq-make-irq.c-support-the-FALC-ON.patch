@@ -1,7 +1,7 @@
-From 03f55cae0f5d9a4c30f935abf8d621ced64ae425 Mon Sep 17 00:00:00 2001
+From 318b9c6242418e1568430c7768371d2bd556109a Mon Sep 17 00:00:00 2001
 From: John Crispin <blogic@openwrt.org>
 Date: Thu, 11 Aug 2011 12:25:55 +0200
-Subject: [PATCH 07/70] MIPS: lantiq: make irq.c support the FALC-ON
+Subject: [PATCH 07/73] MIPS: lantiq: make irq.c support the FALC-ON
 
 There are minor differences in how irqs work on xway and falcon socs.
 Xway needs 2 quirks that we need to disable for falcon to also work with

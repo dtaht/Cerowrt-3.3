@@ -10,10 +10,10 @@ include $(INCLUDE_DIR)/kernel.mk
 
 PKG_NAME:=mac80211
 
-PKG_VERSION:=2012-02-27
+PKG_VERSION:=2012-04-17
 PKG_RELEASE:=1
 PKG_SOURCE_URL:=http://mirror2.openwrt.org/sources
-PKG_MD5SUM:=ccd51c46813c25090ce657c8b7c67615
+PKG_MD5SUM:=2607092b22b5cb552dc3c79921c85369
 
 PKG_SOURCE:=compat-wireless-$(PKG_VERSION).tar.bz2
 PKG_BUILD_DIR:=$(KERNEL_BUILD_DIR)/compat-wireless-$(PKG_VERSION)
@@ -1081,7 +1081,7 @@ define KernelPackage/brcmsmac
   $(call KernelPackage/mac80211/Default)
   TITLE:=Broadcom IEEE802.11n PCIe SoftMAC WLAN driver
   URL:=http://linuxwireless.org/en/users/Drivers/brcm80211
-  DEPENDS+= +@DRIVER_11N_SUPPORT +!TARGET_brcm47xx:kmod-bcma +kmod-lib-cordic +kmod-lib-crc8
+  DEPENDS+= +kmod-mac80211 +@DRIVER_11N_SUPPORT +!TARGET_brcm47xx:kmod-bcma +kmod-lib-cordic +kmod-lib-crc8
   FILES:= \
 	$(PKG_BUILD_DIR)/drivers/net/wireless/brcm80211/brcmsmac/brcmsmac.ko \
 	$(PKG_BUILD_DIR)/drivers/net/wireless/brcm80211/brcmutil/brcmutil.ko
@@ -1248,8 +1248,10 @@ MAKE_OPTS:= \
 	CONFIG_USB_NET_CDCETHER= \
 	CONFIG_USB_USBNET= \
 	CONFIG_AT76C50X_USB= \
+	CONFIG_WL_TI=$(if $(CONFIG_PACKAGE_kmod-wl12xx),m) \
+	CONFIG_WLCORE=$(if $(CONFIG_PACKAGE_kmod-wl12xx),m) \
 	CONFIG_WL12XX=$(if $(CONFIG_PACKAGE_kmod-wl12xx),m) \
-	CONFIG_COMPAT_WL12XX_SDIO=$(if $(CONFIG_PACKAGE_kmod-wl12xx),m) \
+	CONFIG_WLCORE_SDIO=$(if $(CONFIG_PACKAGE_kmod-wl12xx),m) \
 	CONFIG_EEPROM_93CX6= \
 	CONFIG_HERMES=$(if $(CONFIG_PACKAGE_kmod-net-hermes),m) \
 	CONFIG_HERMES_CACHE_FW_ON_INIT= \

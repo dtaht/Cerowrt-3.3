@@ -1,7 +1,7 @@
-From e4e27fbcaf2caa2a3e3ef45c736b4bb14f91ecfe Mon Sep 17 00:00:00 2001
+From 3778c58845f39b145b80ca357ca22a3095a8dfb1 Mon Sep 17 00:00:00 2001
 From: John Crispin <blogic@openwrt.org>
 Date: Tue, 13 Mar 2012 18:03:33 +0100
-Subject: [PATCH 04/70] MTD: add m25p80 id for mx25l2005a
+Subject: [PATCH 04/73] MTD: add m25p80 id for mx25l2005a
 
 ---
  drivers/mtd/devices/m25p80.c |    1 +

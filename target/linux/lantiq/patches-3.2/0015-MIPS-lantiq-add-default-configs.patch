@@ -1,7 +1,7 @@
-From 9946990028431fc732d1244c6ccdfface1ee5640 Mon Sep 17 00:00:00 2001
+From 1b9ea6ce42ae06a5f746b6f1aaa039037b2d71a3 Mon Sep 17 00:00:00 2001
 From: John Crispin <blogic@openwrt.org>
 Date: Fri, 11 Nov 2011 22:02:27 +0100
-Subject: [PATCH 15/70] MIPS: lantiq: add default configs
+Subject: [PATCH 15/73] MIPS: lantiq: add default configs
 
 This patch adds the default config for 3 Lantiq SoCs
 

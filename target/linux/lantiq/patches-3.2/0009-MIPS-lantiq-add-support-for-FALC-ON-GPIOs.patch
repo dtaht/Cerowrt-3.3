@@ -1,7 +1,7 @@
-From 95e7c9e7b37b06462c8b3b8431dc64d60369eb38 Mon Sep 17 00:00:00 2001
+From 61cbe7fcc29f439740e004ca967da852fda58b62 Mon Sep 17 00:00:00 2001
 From: John Crispin <blogic@openwrt.org>
 Date: Thu, 11 Aug 2011 14:35:02 +0200
-Subject: [PATCH 09/70] MIPS: lantiq: add support for FALC-ON GPIOs
+Subject: [PATCH 09/73] MIPS: lantiq: add support for FALC-ON GPIOs
 
 FALC-ON uses a different GPIO core than the other Lantiq SoCs. This patch adds
 the new driver.

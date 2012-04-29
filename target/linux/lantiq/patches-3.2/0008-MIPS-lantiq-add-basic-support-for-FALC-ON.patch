@@ -1,7 +1,7 @@
-From d54a53bc8bc25bf2f9076013f89b30cb9103f99f Mon Sep 17 00:00:00 2001
+From 9124a4d02b182c47c61fc9e58234cde9a070d2d5 Mon Sep 17 00:00:00 2001
 From: John Crispin <blogic@openwrt.org>
 Date: Thu, 11 Aug 2011 14:33:04 +0200
-Subject: [PATCH 08/70] MIPS: lantiq: add basic support for FALC-ON
+Subject: [PATCH 08/73] MIPS: lantiq: add basic support for FALC-ON
 
 Adds support for the FALC-ON SoC. This SoC is from the FTTH/GPON SoC family.
 

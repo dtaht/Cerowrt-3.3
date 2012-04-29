@@ -1,7 +1,7 @@
-From e97f45d255f4a223d38e2f39c1ddf7a3e0766527 Mon Sep 17 00:00:00 2001
+From cf06a3358f752a7d1247498f1e9409b66b23a603 Mon Sep 17 00:00:00 2001
 From: John Crispin <blogic@openwrt.org>
 Date: Thu, 27 Oct 2011 20:06:30 +0200
-Subject: [PATCH 14/70] MIPS: lantiq: fix pull gpio up resistors usage
+Subject: [PATCH 14/73] MIPS: lantiq: fix pull gpio up resistors usage
 
 The register that enables a gpios internal pullups was not used. This patch
 makes sure the pullups are activated correctly.

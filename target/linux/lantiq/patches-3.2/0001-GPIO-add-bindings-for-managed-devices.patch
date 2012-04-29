@@ -1,7 +1,7 @@
-From 282f1ca84b35f3be68abc4fd8b52e229f3cb6bb7 Mon Sep 17 00:00:00 2001
+From 8817c547f92016b9276ffec88b708c2c16d1f0f1 Mon Sep 17 00:00:00 2001
 From: John Crispin <blogic@openwrt.org>
 Date: Thu, 8 Mar 2012 13:23:53 +0100
-Subject: [PATCH 01/70] GPIO: add bindings for managed devices
+Subject: [PATCH 01/73] GPIO: add bindings for managed devices
 
 This patch adds 2 functions that allow managed devices to request GPIOs.
 These GPIOs will then be managed by drivers/base/devres.c.

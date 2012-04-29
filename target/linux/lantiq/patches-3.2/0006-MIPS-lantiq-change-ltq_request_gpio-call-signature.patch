@@ -1,7 +1,7 @@
-From 35f0a707698fc8f20e4164a704d7ac6af3342fb8 Mon Sep 17 00:00:00 2001
+From 2daf93364658fd26bf583b7a46b81c08fddaf1e4 Mon Sep 17 00:00:00 2001
 From: John Crispin <blogic@openwrt.org>
 Date: Fri, 11 Nov 2011 12:45:24 +0100
-Subject: [PATCH 06/70] MIPS: lantiq: change ltq_request_gpio() call signature
+Subject: [PATCH 06/73] MIPS: lantiq: change ltq_request_gpio() call signature
 
 ltq_request_gpio() was using alt0/1 to multiplex the function of GPIO pins.
 This was XWAY specific. In order to also accomodate SoCs that require more bits

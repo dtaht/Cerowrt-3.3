@@ -32,6 +32,7 @@ platform_check_image() {
 	rt-n15 | \
 	rt-n56u | \
 	sl-r7205 | \
+	w306r-v20 |\
 	w502u |\
 	wr6202 |\
 	v22rw-2x2 | \
@@ -39,6 +40,7 @@ platform_check_image() {
 	wl-330n | \
 	wli-tx4-ag300n | \
 	whr-g300n |\
+	ur-336un |\
 	wr512-3gn)
 		[ "$magic" != "2705" ] && {
 			echo "Invalid image type."

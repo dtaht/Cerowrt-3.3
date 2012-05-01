@@ -1,0 +1,39 @@
+From 9bfd1615f8f28a65369a4a60fed78ed8017a255e Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Dave=20T=C3=A4ht?= <dave.taht@bufferbloat.net>
+Date: Sun, 29 Apr 2012 13:49:16 -0700
+Subject: [PATCH] pack icmp hdr for unaligned
+
+---
+ include/linux/icmp.h    |    2 +-
+ scripts/setlocalversion |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/include/linux/icmp.h b/include/linux/icmp.h
+index 474f2a5..0e0fca0 100644
+--- a/include/linux/icmp.h
++++ b/include/linux/icmp.h
+@@ -80,7 +80,7 @@ struct icmphdr {
+ 		__be16	mtu;
+ 	} frag;
+   } un;
+-};
++} __packed;
+ 
+ #ifdef __KERNEL__
+ #include <linux/skbuff.h>
+diff --git a/scripts/setlocalversion b/scripts/setlocalversion
+index bd6dca8..c9a9ca3 100755
+--- a/scripts/setlocalversion
++++ b/scripts/setlocalversion
+@@ -52,7 +52,7 @@ scm_version()
+ 			# If only the short version is requested, don't bother
+ 			# running further git commands
+ 			if $short; then
+-				echo "+"
++				##echo "+"
+ 				return
+ 			fi
+ 			# If we are past a tagged commit (like
+-- 
+1.7.9.5
+

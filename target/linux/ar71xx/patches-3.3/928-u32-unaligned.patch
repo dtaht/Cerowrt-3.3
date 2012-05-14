@@ -1,0 +1,31 @@
+diff --git a/net/sched/cls_u32.c b/net/sched/cls_u32.c
+index 939b627..3df39b0 100644
+--- a/net/sched/cls_u32.c
++++ b/net/sched/cls_u32.c
+@@ -142,7 +142,7 @@ next_knode:
+ 			data = skb_header_pointer(skb, toff, 4, &hdata);
+ 			if (!data)
+ 				goto out;
+-			if ((*data ^ key->val) & key->mask) {
++			if ((__get_unaligned_cpu32(data) ^ key->val) & key->mask) {
+ 				n = n->next;
+ 				goto next_knode;
+ 			}
+@@ -193,7 +193,7 @@ check_terminal:
+ 						  &hdata);
+ 			if (!data)
+ 				goto out;
+-			sel = ht->divisor & u32_hash_fold(*data, &n->sel,
++			sel = ht->divisor & u32_hash_fold(__get_unaligned_cpu32(data), &n->sel,
+ 							  n->fshift);
+ 		}
+ 		if (!(n->sel.flags & (TC_U32_VAROFFSET | TC_U32_OFFSET | TC_U32_EAT)))
+@@ -209,7 +209,7 @@ check_terminal:
+ 							  2, &hdata);
+ 				if (!data)
+ 					goto out;
+-				off2 += ntohs(n->sel.offmask & *data) >>
++				off2 += ntohs(n->sel.offmask & __get_unaligned_cpu16(data)) >>
+ 					n->sel.offshift;
+ 			}
+ 			off2 &= ~3;

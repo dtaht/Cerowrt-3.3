@@ -10,7 +10,7 @@ include $(INCLUDE_DIR)/kernel.mk
 
 PKG_NAME:=ppp
 PKG_VERSION:=2.4.5
-PKG_RELEASE:=4
+PKG_RELEASE:=5
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=ftp://ftp.samba.org/pub/ppp/
@@ -95,6 +95,16 @@ define Package/ppp-mod-radius/conffiles
 /etc/ppp/radius/
 endef
 
+define Package/ppp-mod-pppol2tp
+$(call Package/ppp/Default)
+  DEPENDS:=@(PACKAGE_ppp||PACKAGE_ppp-multilink) +kmod-pppol2tp
+  TITLE:=PPPoL2TP plugin
+endef
+
+define Package/ppp-mod-pppol2tp/description
+This package contains a PPPoL2TP (PPP over L2TP) plugin for ppp.
+endef
+
 define Package/chat
 $(call Package/ppp/Default)
   DEPENDS:=@(PACKAGE_ppp||PACKAGE_ppp-multilink)
@@ -156,31 +166,8 @@ define Build/InstallDev
 	$(CP) $(PKG_INSTALL_DIR)/include/pppd $(1)/usr/include/
 endef
 
-ifneq ($(CONFIG_PACKAGE_netifd),)
-  define Package/ppp/script_install
-	$(INSTALL_DIR) $(1)/lib/netifd/proto
-	$(INSTALL_BIN) ./files/ppp.sh $(1)/lib/netifd/proto/
-	$(INSTALL_BIN) ./files/lib/netifd/ppp-up $(1)/lib/netifd/
-	$(INSTALL_BIN) ./files/lib/netifd/ppp-down $(1)/lib/netifd/
-  endef
-else
-  define Package/ppp/script_install
-	$(INSTALL_DIR) $(1)/lib/network
-	$(INSTALL_BIN) ./files.old/ppp.sh $(1)/lib/network/
-	$(INSTALL_BIN) ./files.old/etc/ppp/ip-up $(1)/etc/ppp/
-	$(INSTALL_DIR) $(1)/etc/ppp/ip-up.d
-	$(INSTALL_BIN) ./files.old/etc/ppp/ip-down $(1)/etc/ppp/
-	$(INSTALL_DIR) $(1)/etc/ppp/ip-down.d
-	$(INSTALL_BIN) ./files.old/etc/ppp/ipv6-up $(1)/etc/ppp/
-	$(INSTALL_BIN) ./files.old/etc/ppp/ipv6-down $(1)/etc/ppp/
-	$(INSTALL_DIR) $(1)/lib/network
-	$(INSTALL_BIN) ./files.old/pppoe.sh $(1)/lib/network/
-	$(INSTALL_DIR) $(1)/lib/network
-	$(INSTALL_BIN) ./files.old/pppoa.sh $(1)/lib/network/
-	$(INSTALL_DIR) $(1)/etc/hotplug.d/atm
-	$(INSTALL_DATA) ./files.old/etc/hotplug.d/atm/20-atm-modem $(1)/etc/hotplug.d/atm/
-  endef
-endif
+define Package/ppp/script_install
+endef
 
 define Package/ppp/install
 	$(INSTALL_DIR) $(1)/usr/lib/pppd/$(PKG_VERSION)
@@ -191,7 +178,10 @@ define Package/ppp/install
 	$(INSTALL_DATA) ./files/etc/ppp/filter $(1)/etc/ppp/
 	$(INSTALL_DATA) ./files/etc/ppp/options $(1)/etc/ppp/
 	ln -sf /tmp/resolv.conf.ppp $(1)/etc/ppp/resolv.conf
-	$(Package/ppp/script_install)
+	$(INSTALL_DIR) $(1)/lib/netifd/proto
+	$(INSTALL_BIN) ./files/ppp.sh $(1)/lib/netifd/proto/
+	$(INSTALL_BIN) ./files/lib/netifd/ppp-up $(1)/lib/netifd/
+	$(INSTALL_BIN) ./files/lib/netifd/ppp-down $(1)/lib/netifd/
 endef
 Package/ppp-multilink/install=$(Package/ppp/install)
 
@@ -220,6 +210,12 @@ define Package/ppp-mod-radius/install
 		$(1)/etc/ppp/radius/
 endef
 
+define Package/ppp-mod-pppol2tp/install
+	$(INSTALL_DIR) $(1)/usr/lib/pppd/$(PKG_VERSION)
+	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/lib/pppd/$(PKG_VERSION)/pppol2tp.so \
+		$(1)/usr/lib/pppd/$(PKG_VERSION)/
+endef
+
 define Package/chat/install
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/sbin/chat $(1)/usr/sbin/
@@ -240,6 +236,7 @@ $(eval $(call BuildPackage,ppp-multilink))
 $(eval $(call BuildPackage,ppp-mod-pppoa))
 $(eval $(call BuildPackage,ppp-mod-pppoe))
 $(eval $(call BuildPackage,ppp-mod-radius))
+$(eval $(call BuildPackage,ppp-mod-pppol2tp))
 $(eval $(call BuildPackage,chat))
 $(eval $(call BuildPackage,pppdump))
 $(eval $(call BuildPackage,pppstats))

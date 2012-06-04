@@ -877,6 +877,11 @@ define Image/Build/Profile/TLMR3020
 	$(call Image/Build/Template/$(fs_64k)/$(1),TPLINK-LZMA,tl-mr3020-v1,$(tlmr3020_cmdline),0x30200001,1,4Mlzma)
 endef
 
+tlmr3040_cmdline=board=TL-MR11U console=ttyATH0,115200
+define Image/Build/Profile/TLMR3040
+	$(call Image/Build/Template/$(fs_64kraw)/$(1),TPLINK-LZMA,tl-mr3040-v1,$(tlmr3040_cmdline),0x30400001,1,4Mlzma)
+endef
+
 tlmr3220_cmdline=board=TL-MR3220 console=ttyS0,115200
 define Image/Build/Profile/TLMR3220
 	$(call Image/Build/Template/$(fs_64kraw)/$(1),TPLINK,tl-mr3220-v1,$(tlmr3220_cmdline),0x32200001,1,4M)
@@ -946,6 +951,11 @@ define Image/Build/Profile/TLWR941
 	$(call Image/Build/Template/$(fs_64kraw)/$(1),TPLINK,tl-wr941nd-v2,$(tlwr941v2_cmdline),0x09410002,2,4M)
 	$(call Image/Build/Template/$(fs_64kraw)/$(1),TPLINK,tl-wr941nd-v3,$(tlwr941v2_cmdline),0x09410002,2,4M)
 	$(call Image/Build/Template/$(fs_64kraw)/$(1),TPLINK,tl-wr941nd-v4,$(tlwr941v4_cmdline),0x09410004,1,4M)
+endef
+
+tlwr1041_cmdline=board=TL-WR1041N-v2 console=ttyS0,115200
+define Image/Build/Profile/TLWR1041
+	$(call Image/Build/Template/$(fs_64kraw)/$(1),TPLINK-LZMA,tl-wr1041n-v2,$(tlwr1041_cmdline),0x10410002,1,4Mlzma)
 endef
 
 tlwr1043_cmdline=board=TL-WR1043ND console=ttyS0,115200
@@ -1076,6 +1086,7 @@ define Image/Build/Profile/Default
 	$(call Image/Build/Profile/TEW673GRU,$(1))
 	$(call Image/Build/Profile/TLMR11U,$(1))
 	$(call Image/Build/Profile/TLMR3020,$(1))
+	$(call Image/Build/Profile/TLMR3040,$(1))
 	$(call Image/Build/Profile/TLMR3220,$(1))
 	$(call Image/Build/Profile/TLMR3420,$(1))
 	$(call Image/Build/Profile/TLWA701,$(1))
@@ -1087,6 +1098,7 @@ define Image/Build/Profile/Default
 	$(call Image/Build/Profile/TLWR841,$(1))
 	$(call Image/Build/Profile/TLWR842,$(1))
 	$(call Image/Build/Profile/TLWR941,$(1))
+	$(call Image/Build/Profile/TLWR1041,$(1))
 	$(call Image/Build/Profile/TLWR1043,$(1))
 	$(call Image/Build/Profile/TLWR2543,$(1))
 	$(call Image/Build/Profile/UBNT,$(1))

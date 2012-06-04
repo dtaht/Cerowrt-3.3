@@ -16,15 +16,10 @@ define KernelPackage/usb-core
   TITLE:=Support for USB
   DEPENDS:=@USB_SUPPORT
   KCONFIG:=CONFIG_USB CONFIG_XPS_USB_HCD_XILINX=n CONFIG_USB_FHCI_HCD=n
-  ifeq ($(strip $(call CompareKernelPatchVer,$(KERNEL_PATCHVER),ge,3.2)),1)
-    FILES:= \
+  FILES:= \
 	$(LINUX_DIR)/drivers/usb/core/usbcore.ko \
 	$(LINUX_DIR)/drivers/usb/usb-common.ko
-    AUTOLOAD:=$(call AutoLoad,20,usb-common usbcore,1)
-  else
-    FILES:=$(LINUX_DIR)/drivers/usb/core/usbcore.ko
-    AUTOLOAD:=$(call AutoLoad,20,usbcore,1)
-  endif
+  AUTOLOAD:=$(call AutoLoad,20,usb-common usbcore,1)
   $(call AddDepends/nls)
 endef
 
@@ -307,21 +302,6 @@ define AddDepends/usb-serial
 endef
 
 
-define KernelPackage/usb-serial-airprime
-  TITLE:=Support for Airprime (EVDO)
-  KCONFIG:=CONFIG_USB_SERIAL_AIRPRIME
-  FILES:=$(LINUX_DIR)/drivers/usb/serial/airprime.ko
-  AUTOLOAD:=$(call AutoLoad,65,airprime)
-  $(call AddDepends/usb-serial)
-endef
-
-define KernelPackage/usb-serial-airprime/description
- Kernel support for Airprime (EVDO)
-endef
-
-$(eval $(call KernelPackage,usb-serial-airprime))
-
-
 define KernelPackage/usb-serial-belkin
   TITLE:=Support for Belkin devices
   KCONFIG:=CONFIG_USB_SERIAL_BELKIN
@@ -576,7 +556,6 @@ $(eval $(call KernelPackage,usb-serial-keyspan))
 
 define KernelPackage/usb-serial-wwan
   TITLE:=Support for GSM and CDMA modems
-  DEPENDS:= @!LINUX_2_6_30&&!LINUX_2_6_31&&!LINUX_2_6_32
   KCONFIG:=CONFIG_USB_SERIAL_WWAN
   FILES:=$(LINUX_DIR)/drivers/usb/serial/usb_wwan.ko
   AUTOLOAD:=$(call AutoLoad,61,usb_wwan)
@@ -592,7 +571,7 @@ $(eval $(call KernelPackage,usb-serial-wwan))
 
 define KernelPackage/usb-serial-option
   TITLE:=Support for Option HSDPA modems
-  DEPENDS:=+!LINUX_2_6_30&&!LINUX_2_6_31&&!LINUX_2_6_32:kmod-usb-serial-wwan
+  DEPENDS:=+kmod-usb-serial-wwan
   KCONFIG:=CONFIG_USB_SERIAL_OPTION
   FILES:=$(LINUX_DIR)/drivers/usb/serial/option.ko
   AUTOLOAD:=$(call AutoLoad,65,option)
@@ -674,21 +653,6 @@ define KernelPackage/usb-storage-extras/description
 endef
 
 $(eval $(call KernelPackage,usb-storage-extras))
-
-
-define KernelPackage/usb-video
-  TITLE:=Support for USB video devices
-  KCONFIG:=CONFIG_VIDEO_USBVIDEO
-  FILES:=$(LINUX_DIR)/drivers/media/video/usbvideo/usbvideo.ko
-  AUTOLOAD:=$(call AutoLoad,61,usbvideo)
-  $(call AddDepends/usb)
-endef
-
-define KernelPackage/usb-video/description
- Kernel support for USB video devices
-endef
-
-$(eval $(call KernelPackage,usb-video))
 
 
 define KernelPackage/usb-atm
@@ -993,19 +957,6 @@ endef
 
 $(eval $(call KernelPackage,usb-test))
 
-
-define KernelPackage/usb-phidget
-  TITLE:=USB Phidget Driver
-  KCONFIG:=CONFIG_USB_PHIDGET CONFIG_USB_PHIDGETKIT CONFIG_USB_PHIDGETMOTORCONTROL CONFIG_USB_PHIDGETSERVO
-  FILES:=$(LINUX_DIR)/drivers/usb/misc/phidget*.ko
-$(call AddDepends/usb)
-endef
-
-define KernelPackage/usb-phidget/description
- Kernel support for USB Phidget devices.
-endef
-
-$(eval $(call KernelPackage,usb-phidget))
 
 define KernelPackage/usb-rt305x-dwc_otg
   TITLE:=RT305X USB controller driver

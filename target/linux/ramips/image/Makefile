@@ -158,14 +158,14 @@ mtdlayout_dir300b1=192k(u-boot)ro,64k(devdata)ro,64k(devconf)ro,896k(kernel),288
 mtd_dir300b1_kernel_part_size=917504
 mtd_dir300b1_rootfs_part_size=2949120
 define BuildFirmware/DIR300B1
-	$(call BuildFirmware/Generic,$(1),$(2),board=$(3) $(call mkmtd/phys,$(mtdlayout_dir300b1)),$(mtd_dir300b1_kernel_part_size),$(mtd_dir300b1_rootfs_part_size))
+	$(call BuildFirmware/Generic,$(1),$(2),$(call mkcmdline,$(3),ttyS1,57600) $(call mkmtd/phys,$(mtdlayout_dir300b1)),$(mtd_dir300b1_kernel_part_size),$(mtd_dir300b1_rootfs_part_size))
 	mkwrgimg -s $(4) -d /dev/mtdblock/2 \
 		-i $(call sysupname,$(1),$(2)) \
 		-o $(call imgname,$(1),$(2))-factory.bin
 endef
 
 define BuildFirmware/DIR300B1/initramfs
-	$(call BuildFirmware/Generic/initramfs,$(1),$(2),board=$(3) $(call mkmtd/phys,$(mtdlayout_dir300b1)),$(mtd_dir300b1_kernel_part_size),$(mtd_dir300b1_rootfs_part_size))
+	$(call BuildFirmware/Generic/initramfs,$(1),$(2),$(call mkcmdline,$(3),ttyS1,57600) $(call mkmtd/phys,$(mtdlayout_dir300b1)),$(mtd_dir300b1_kernel_part_size),$(mtd_dir300b1_rootfs_part_size))
 endef
 
 define BuildFirmware/Edimax
@@ -218,6 +218,18 @@ mtd_rtn10plus_kernel_part_size=917504
 mtd_rtn10plus_rootfs_part_size=2949120
 define BuildFirmware/RTN10PLUS
 	$(call BuildFirmware/Generic,$(1),$(2),board=$(3) $(call mkmtd/phys,$(mtdlayout_rtn10plus)),$(mtd_rtn10plus_kernel_part_size),$(mtd_rtn10plus_rootfs_part_size))
+endef
+
+define BuildFirmware/W306R_4M
+	$(call BuildFirmware/w306r,$(1),$(2),$(call mkcmdline,$(3),$(4),$(5)) $(call mkmtd/$(6),$(mtdlayout_4M)),917504,2949120)
+endef
+
+define BuildFirmware/w306r
+	$(call PatchKernelLzma,$(2),$(3))
+	mkimage -A mips -O linux -T kernel -C lzma $(call kernel_entry)\
+	 -n 'linkn Kernel Image' \
+	 -d $(KDIR)/vmlinux-$(2).bin.lzma $(KDIR)/vmlinux-$(2).uImage
+	$(call CatFiles,$(KDIR)/vmlinux-$(2).uImage,$(4),$(KDIR)/root.$(1),$(5),$(call imgname,$(1),$(2))-factory.bin)
 endef
 
 mtdlayout_whrg300n=192k(u-boot)ro,64k(u-boot-env)ro,64k(factory)ro,960k(kernel),2752k(rootfs),64k(user)ro,3712k@0x50000(firmware)
@@ -377,6 +389,7 @@ endef
 
 define Image/Build/Profile/W306R_V20
 	$(call Image/Build/Template/$(fs_squash)/$(1),GENERIC_4M,w306r-v20,W306R_V20,ttyS1,57600,phys)
+	$(call Image/Build/Template/$(fs_squash)/$(1),W306R_4M,w306r-v20,W306R_V20,ttyS1,57600,phys)
 endef
 
 define Image/Build/Profile/W502U

@@ -8,18 +8,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=dnsmasq
-PKG_VERSION:=2.61-1-5-git
-PKG_RELEASE:=2
+PKG_VERSION:=2.59
+PKG_RELEASE:=4
 
-PKG_SOURCE_PROTO:=git
-PKG_SOURCE_URL:=git://thekelleys.org.uk/dnsmasq.git
-PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
-PKG_SOURCE_VERSION:=6f13e538868b0c5ecb49cf87559740d3e65f68bf
-PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION)-$(PKG_SOURCE_VERSION).tar.gz
-
-#PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
-#PKG_SOURCE_URL:=http://thekelleys.org.uk/dnsmasq
-#PKG_MD5SUM:=b5757ef2d7b651748eeebb88af29d7d6
+PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+PKG_SOURCE_URL:=http://thekelleys.org.uk/dnsmasq
+PKG_MD5SUM:=b5757ef2d7b651748eeebb88af29d7d6
 
 PKG_INSTALL:=1
 

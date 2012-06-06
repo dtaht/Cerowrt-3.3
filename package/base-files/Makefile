@@ -11,7 +11,7 @@ include $(INCLUDE_DIR)/kernel.mk
 include $(INCLUDE_DIR)/version.mk
 
 PKG_NAME:=base-files
-PKG_RELEASE:=108
+PKG_RELEASE:=109
 
 PKG_FILE_DEPENDS:=$(PLATFORM_DIR)/ $(GENERIC_PLATFORM_DIR)/base-files/
 PKG_BUILD_DEPENDS:=opkg/host
@@ -443,10 +443,6 @@ define Package/base-files/install
 			$(CP) $(PLATFORM_SUBDIR)/$(PROFILE)/base-files/* $(1)/; \
 		fi \
 	)
-# Form valid /etc/shadow entries, by copying the user:pw pairs
-# from /etc/passwd, and adding on pw change data
-	cut -d ':' -f 1-2 $(1)/etc/passwd > $(1)/etc/shadow; \
-	$(SED) 's/$$$$/:0:0:99999:7:::/' $(1)/etc/shadow
 
 	$(VERSION_SED) \
 		$(1)/etc/banner \
@@ -474,6 +470,10 @@ define Package/base-files/install
 	ln -sf /tmp $(1)/var
 	mkdir -p $(1)/etc
 	ln -sf /tmp/resolv.conf /tmp/fstab /tmp/TZ $(1)/etc/
+
+	chmod 0600 $(1)/etc/shadow
+	chmod 1777 $(1)/tmp
+
 	$(call ImageConfigOptions,$(1))
 	$(call Package/base-files/install-target,$(1))
 	for conffile in $(1)/etc/config/*; do \

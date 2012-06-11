@@ -72,6 +72,10 @@ ppp_generic_teardown() {
 			proto_notify_error "$interface" AUTH_FAILED
 			proto_block_restart "$interface"
 		;;
+		2)
+			proto_notify_error "$interface" INVALID_OPTIONS
+			proto_block_restart "$interface"
+		;;
 	esac
 	proto_kill_command "$interface"
 }
@@ -133,6 +137,8 @@ proto_pppoa_init_config() {
 	proto_config_add_int "vci"
 	proto_config_add_int "vpi"
 	proto_config_add_string "encaps"
+	no_device=1
+	available=1
 }
 
 proto_pppoa_setup() {

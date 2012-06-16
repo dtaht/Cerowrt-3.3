@@ -154,6 +154,22 @@ define Image/mkfs/prepare
 endef
 
 
+ifeq ($(CONFIG_SIGN_FILES),y)
+  define Image/Sign
+	( cd ${BIN_DIR} ; \
+		for IMAGE in $$$$($(FIND) -maxdepth 1 -type f \! -name 'md5sums' \! -name '*.asc' -printf "%P\n"); do \
+			gpg --armor \
+			    --batch \
+			    --detach-sign \
+			    --local-user $(CONFIG_GPG_KEY) \
+			    --yes \
+			    --output $$$$IMAGE.asc $$$$IMAGE; \
+		done \
+	)
+  endef
+endif
+
+
 define Image/Checksum
 	( cd ${BIN_DIR} ; \
 		$(FIND) -maxdepth 1 -type f \! -name 'md5sums'  -printf "%P\n" | sort | xargs \
@@ -186,6 +202,7 @@ define BuildImage
 		$(call Image/mkfs/jffs2)
 		$(call Image/mkfs/squashfs)
 		$(call Image/mkfs/ubifs)
+		$(call Image/Sign)
 		$(call Image/Checksum)
   else
     install: compile install-targets
@@ -197,6 +214,7 @@ define BuildImage
 		$(call Image/mkfs/jffs2)
 		$(call Image/mkfs/squashfs)
 		$(call Image/mkfs/ubifs)
+		$(call Image/Sign)
 		$(call Image/Checksum)
   endif
 

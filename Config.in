@@ -1,4 +1,5 @@
-# Copyright (C) 2006-2010 OpenWrt.org
+#
+# Copyright (C) 2006-2012 OpenWrt.org
 #
 # This is free software, licensed under the GNU General Public License v2.
 # See /LICENSE for more information.
@@ -395,6 +396,57 @@ menu "Global build settings"
 		  selected packages (including those selected as <M>)
 		  Note that this will make the system libraries incompatible with most of the packages
 		  that are not selected during the build process
+
+	comment "Signing options"
+
+	config SIGN_FILES
+		bool
+		prompt "Sign the generated files using GPG"
+		default n
+		help
+			This will sign the generated files using GPG
+
+	config GPG_KEY
+		string "Key ID" if SIGN_FILES || USE_GPG
+		default ""
+
+	choice
+		prompt "Package index signing method"
+		default NO_SIGN_INDEX
+		help
+		  Select the Package index signing method you wish to use.
+
+		config NO_SIGN_INDEX
+			bool "None"
+			help
+			  This will not sign the Package index
+
+		config USE_GPG
+			bool "GPG"
+			select PACKAGE_opkg-gpg
+#			deselect PACKAGE_opkg
+			help
+			  This will sign the Package index using GPG
+
+		config USE_SMIME
+			bool "S/MIME"
+			select PACKAGE_opkg-smime
+#			deselect PACKAGE_opkg
+			help
+			  This will sign the Package index using S/MIME
+
+		config SMIME_CA
+			string "Certificate authority file" if USE_SMIME
+			default ""
+
+		config SMIME_INTERMEDIATE
+			string "Intermediate certificate authority file(s)" if USE_SMIME
+			default ""
+
+		config SMIME_CERTIFICATE
+			string "Signing certificate file" if USE_SMIME
+			default ""
+	endchoice
 
 endmenu
 

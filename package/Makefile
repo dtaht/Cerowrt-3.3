@@ -61,6 +61,29 @@ ifdef CONFIG_USE_MKLIBS
   endef
 endif
 
+ifdef CONFIG_USE_GPG
+  define gpg
+	@(cd $(PACKAGE_DIR); gpg --batch \
+		--detach-sign \
+		--local-user $(CONFIG_GPG_KEY) \
+		--yes \
+		--output Packages.sig Packages \
+	)
+  endef
+endif
+
+ifdef CONFIG_USE_SMIME
+  define smime
+	@(cd $(PACKAGE_DIR); openssl smime -binary \
+		-in Packages \
+		-out Packages.sig \
+		-outform PEM \
+		-sign \
+		-signer $(CONFIG_SMIME_CERTIFICATE) \
+	)
+  endef
+endif
+
 $(curdir)/rootfs-prepare: $(TMP_DIR)/.build
 	@-$(MAKE) package/preconfig
 	@if [ -d $(TOPDIR)/files ]; then \
@@ -93,6 +116,8 @@ $(curdir)/index: FORCE
 	@(cd $(PACKAGE_DIR); $(SCRIPT_DIR)/ipkg-make-index.sh . 2>&1 > Packages && \
 		gzip -9c Packages > Packages.gz \
 	)
+	$(call gpg)
+	$(call smime)
 
 $(curdir)/flags-install:= -j1
 

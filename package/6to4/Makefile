@@ -8,7 +8,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=6to4
-PKG_VERSION:=8
+PKG_VERSION:=9
 PKG_RELEASE:=1
 
 include $(INCLUDE_DIR)/package.mk
@@ -16,7 +16,7 @@ include $(INCLUDE_DIR)/package.mk
 define Package/6to4
   SECTION:=ipv6
   CATEGORY:=IPv6
-  DEPENDS:=+ip +kmod-ipv6 +kmod-sit
+  DEPENDS:=+kmod-ipv6 +kmod-sit
   TITLE:=IPv6-to-IPv4 configuration support
   MAINTAINER:=Jo-Philipp Wich <xm@subsignal.org>
   PKGARCH:=all

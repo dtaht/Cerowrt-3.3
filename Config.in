@@ -47,7 +47,6 @@ menu "Target Images"
 
 			config TARGET_INITRAMFS_COMPRESSION_XZ
 				bool "xz"
-				depends !LINUX_2_6_30&&!LINUX_2_6_31&&!LINUX_2_6_32&&!LINUX_2_6_36&&!LINUX_2_6_37
 		endchoice
 
 		config EXTERNAL_CPIO
@@ -397,6 +396,7 @@ menu "Global build settings"
 		  Note that this will make the system libraries incompatible with most of the packages
 		  that are not selected during the build process
 
+<<<<<<< HEAD
 	comment "Signing options"
 
 	config SIGN_FILES
@@ -446,6 +446,20 @@ menu "Global build settings"
 		config SMIME_CERTIFICATE
 			string "Signing certificate file" if USE_SMIME
 			default ""
+=======
+	choice
+		prompt "Preferred standard C++ library"
+		default USE_LIBSTDCXX if USE_EGLIBC
+		default USE_UCLIBCXX
+		help
+		  Select the preferred standard C++ library for all packages that support this.
+
+		config USE_UCLIBCXX
+			bool "uClibc++"
+
+		config USE_LIBSTDCXX
+			bool "libstdc++"
+
 	endchoice
 
 endmenu

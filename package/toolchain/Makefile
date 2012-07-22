@@ -61,7 +61,7 @@ define Package/libssp/config
 	menu "Configuration"
 		depends EXTERNAL_TOOLCHAIN && PACKAGE_libssp
 
-	config LIBSPP_ROOT_DIR
+	config LIBSSP_ROOT_DIR
 		string
 		prompt "libssp shared library base directory"
 		depends EXTERNAL_TOOLCHAIN && PACKAGE_libssp
@@ -355,12 +355,12 @@ ifeq ($(CONFIG_EXTERNAL_TOOLCHAIN),)
 
   define Package/libgcc/install
 	$(INSTALL_DIR) $(1)/lib
-	$(if $(TARGET_avr32)$(TARGET_coldfire),,$(CP) $(TOOLCHAIN_DIR)/lib/libgcc_s.so.* $(1)/lib/)
+	$(if $(CONFIG_TARGET_avr32)$(CONFIG_TARGET_coldfire),,$(CP) $(TOOLCHAIN_DIR)/lib/libgcc_s.so.* $(1)/lib/)
   endef
 
   define Package/libgfortran/install
 	$(INSTALL_DIR) $(1)/usr/lib
-	$(if $(TARGET_avr32)$(TARGET_coldfire),,$(CP) $(TOOLCHAIN_DIR)/lib/libgfortran.so.* $(1)/usr/lib/)
+	$(if $(CONFIG_TARGET_avr32)$(CONFIG_TARGET_coldfire),,$(CP) $(TOOLCHAIN_DIR)/lib/libgfortran.so.* $(1)/usr/lib/)
   endef
 
   define Package/libssp/install

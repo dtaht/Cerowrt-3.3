@@ -17,8 +17,15 @@ export SED:=
 
 include $(INCLUDE_DIR)/host-build.mk
 
+HOST_CONFIGURE_ARGS += \
+	--disable-acl \
+	--disable-nls \
+
+HOST_CONFIGURE_VARS += \
+	ac_cv_search_setfilecon=no \
+
 define Host/Compile
-	$(MAKE) -C $(HOST_BUILD_DIR) SHELL="$(BASH)"
+	$(MAKE) -C $(HOST_BUILD_DIR) SHELL="$(BASH)" LDFLAGS="-static"
 endef
 
 define Host/Install

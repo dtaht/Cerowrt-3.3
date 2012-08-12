@@ -11,6 +11,8 @@ TARGET_DTBS := rbt-832 dlan-usb-extender
 
 LOADADDR:=0x00008000
 
+JFFS2_BLOCKSIZE = 128k
+
 UIMAGE:=$(BIN_DIR)/$(IMG_PREFIX)-uImage
 ifeq ($(CONFIG_TARGET_ROOTFS_INITRAMFS),y)
 	UIMAGE:=$(BIN_DIR)/$(IMG_PREFIX)-uImage-initramfs
@@ -33,9 +35,9 @@ define Image/Prepare
 endef
 
 define Image/Build/dlan
-	dd if=$(KDIR)/uImage-dlan-usb-extender bs=1M conv=sync of=$(KDIR)/$(IMG_PREFIX)-dlan-usb-extender-upgrade.bin
-	cat $(KDIR)/root.$(1) >> $(KDIR)/$(IMG_PREFIX)-dlan-usb-extender-upgrade.bin
-	cp $(KDIR)/$(IMG_PREFIX)-dlan-usb-extender-upgrade.bin $(BIN_DIR)/
+	dd if=$(KDIR)/uImage-dlan-usb-extender bs=1M conv=sync of=$(KDIR)/$(IMG_PREFIX)-dlan-usb-extender-upgrade-$(1).bin
+	cat $(KDIR)/root.$(1) >> $(KDIR)/$(IMG_PREFIX)-dlan-usb-extender-upgrade-$(1).bin
+	cp $(KDIR)/$(IMG_PREFIX)-dlan-usb-extender-upgrade-$(1).bin $(BIN_DIR)/
 endef
 
 define Image/BuildKernel

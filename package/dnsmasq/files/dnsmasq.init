@@ -157,6 +157,10 @@ dnsmasq() {
 	}
 
 	dhcp_option_add "$cfg" "" 0
+	config_get ra_names "$cfg" ra_names
+	[ -n "$ra_names" ] && {
+		xappend "--dhcp-range=$networkid,$ra_names,ra-names,$leasetime"
+	}
 
 	echo >> $CONFIGFILE
 }

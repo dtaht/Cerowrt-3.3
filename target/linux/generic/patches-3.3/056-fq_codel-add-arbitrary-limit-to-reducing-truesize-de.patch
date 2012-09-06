@@ -1,0 +1,29 @@
+From 594b9a6e07acade624c822321a3315d6062b6a63 Mon Sep 17 00:00:00 2001
+From: Dave Taht <dave.taht@bufferbloat.net>
+Date: Mon, 27 Aug 2012 10:36:08 -0700
+Subject: [PATCH 4/4] fq_codel: add arbitrary limit to reducing truesize
+ decision
+
+If a given queue has more than 128 packets in it, start reducing
+truesize. Originally I'd done sch->limit/8 and decided that that
+wasn't aggressive enough, so 128 seems rational on small routers.
+---
+ net/sched/sch_fq_codel.c |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/net/sched/sch_fq_codel.c b/net/sched/sch_fq_codel.c
+index be3e8cc..e7b5e53 100644
+--- a/net/sched/sch_fq_codel.c
++++ b/net/sched/sch_fq_codel.c
+@@ -202,6 +202,8 @@ static int fq_codel_enqueue(struct sk_buff *skb, struct Qdisc *sch)
+ 		return ret;
+ 	}
+ 	idx--;
++	if (sch->q.qlen > 128)
++		skb = skb_reduce_truesize(skb);	
+ 
+ 	codel_set_enqueue_time(skb);
+ 	flow = &q->flows[idx];
+-- 
+1.7.9.5
+

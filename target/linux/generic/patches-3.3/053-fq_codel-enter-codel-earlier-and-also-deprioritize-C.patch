@@ -1,0 +1,92 @@
+From f7887fb726e5bea62059f5805cce6b419cb33351 Mon Sep 17 00:00:00 2001
+From: Dave Taht <dave.taht@bufferbloat.net>
+Date: Sun, 26 Aug 2012 20:46:03 -0700
+Subject: [PATCH 1/4] fq_codel: enter codel earlier and also deprioritize CS1
+ streams
+
+fq_codel was basically pure sfq on lower bandwidths, because
+a queue could not form and have its state retained. Only on
+the largest flows would codel begin to respond (appropriately,
+but late).
+
+This patch moves codel up into new flows and also retains its state
+until codel decides to change it.
+
+Additionally, a simple change to the new_flow/old_flow idea makes
+it possible to deprioritize CS1 streams slightly.
+---
+ net/sched/sch_fq_codel.c |   28 ++++++++++++++++++++++++----
+ 1 file changed, 24 insertions(+), 4 deletions(-)
+
+diff --git a/net/sched/sch_fq_codel.c b/net/sched/sch_fq_codel.c
+index 9fc1c62..be3e8cc 100644
+--- a/net/sched/sch_fq_codel.c
++++ b/net/sched/sch_fq_codel.c
+@@ -24,6 +24,7 @@
+ #include <net/netlink.h>
+ #include <net/pkt_sched.h>
+ #include <net/flow_keys.h>
++#include <net/dsfield.h>
+ #include <net/codel.h>
+ 
+ /*	Fair Queue CoDel.
+@@ -80,6 +81,25 @@ static unsigned int fq_codel_hash(const struct fq_codel_sched_data *q,
+ 	return ((u64)hash * q->flows_cnt) >> 32;
+ }
+ 
++/* 
++ * subtly deprioritize traffic marked background 
++ */
++
++static bool deprio(const struct sk_buff *skb) {
++	int dscp;
++        switch (skb->protocol) {
++        case htons(ETH_P_IP):
++                dscp = ipv4_get_dsfield(ip_hdr(skb)) & 0xfc;
++                break;
++        case htons(ETH_P_IPV6):
++                dscp = ipv6_get_dsfield(ipv6_hdr(skb)) & 0xfc;
++                break;
++        default:
++                return false;
++        }
++	return(dscp == 32);
++}
++
+ static unsigned int fq_codel_classify(struct sk_buff *skb, struct Qdisc *sch,
+ 				      int *qerr)
+ {
+@@ -190,11 +210,10 @@ static int fq_codel_enqueue(struct sk_buff *skb, struct Qdisc *sch)
+ 	sch->qstats.backlog += qdisc_pkt_len(skb);
+ 
+ 	if (list_empty(&flow->flowchain)) {
+-		list_add_tail(&flow->flowchain, &q->new_flows);
+-		codel_vars_init(&flow->cvars);
++		list_add_tail(&flow->flowchain, deprio(skb) ? 
++			      &q->old_flows : &q->new_flows);
+ 		q->new_flow_count++;
+ 		flow->deficit = q->quantum;
+-		flow->dropped = 0;
+ 	}
+ 	if (++sch->q.qlen < sch->limit)
+ 		return NET_XMIT_SUCCESS;
+@@ -340,7 +359,7 @@ static int fq_codel_change(struct Qdisc *sch, struct nlattr *opt)
+ 		q->cparams.ecn = !!nla_get_u32(tb[TCA_FQ_CODEL_ECN]);
+ 
+ 	if (tb[TCA_FQ_CODEL_QUANTUM])
+-		q->quantum = max(256U, nla_get_u32(tb[TCA_FQ_CODEL_QUANTUM]));
++		q->quantum = max(64U, nla_get_u32(tb[TCA_FQ_CODEL_QUANTUM]));
+ 
+ 	while (sch->q.qlen > sch->limit) {
+ 		struct sk_buff *skb = fq_codel_dequeue(sch);
+@@ -418,6 +437,7 @@ static int fq_codel_init(struct Qdisc *sch, struct nlattr *opt)
+ 			struct fq_codel_flow *flow = q->flows + i;
+ 
+ 			INIT_LIST_HEAD(&flow->flowchain);
++			codel_vars_init(&flow->cvars);
+ 		}
+ 	}
+ 	if (sch->limit >= 1)
+-- 
+1.7.9.5
+

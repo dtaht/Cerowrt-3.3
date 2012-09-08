@@ -534,7 +534,7 @@ rt305x_esw_apply_config(struct switch_dev *dev)
 			untag     |= esw->ports[i].untag     << i;
 			pvid       = esw->ports[i].pvid;
 		} else {
-			int x = esw->alt_vlan_disable ? 1 : 0;
+			int x = esw->alt_vlan_disable ? 0 : 1;
 			doubletag |= x << i;
 			en_vlan   |= x << i;
 			untag     |= x << i;
@@ -750,11 +750,13 @@ rt305x_esw_get_port_recv_badgood(struct switch_dev *dev,
 	struct rt305x_esw *esw = container_of(dev, struct rt305x_esw, swdev);
 	int idx = val->port_vlan;
 	int shift = attr->id == RT305X_ESW_ATTR_PORT_RECV_GOOD ? 0 : 16;
+	u32 reg;
 
 	if (idx < 0 || idx >= RT305X_ESW_NUM_LANWAN)
 		return -EINVAL;
 
-	val->value.i = rt305x_esw_rr(esw, RT305X_ESW_REG_P0PC + 4*idx) >> shift;
+	reg = rt305x_esw_rr(esw, RT305X_ESW_REG_P0PC + 4*idx);
+	val->value.i = (reg >> shift) & 0xffff;
 
 	return 0;
 }

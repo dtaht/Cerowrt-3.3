@@ -152,6 +152,7 @@ define Build/Compile
 		DESTDIR="$(PKG_INSTALL_DIR)" \
 		HOST_CPU="$(PKGARCH)" \
 		LDFLAGS="-Wl,--gc-sections" \
+endif
 
 define Package/opkg/Default/install
 	$(INSTALL_DIR) $(1)/usr/lib/opkg

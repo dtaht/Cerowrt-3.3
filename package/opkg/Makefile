@@ -145,15 +145,11 @@ ifeq ($(BUILD_VARIANT),smime)
 		--enable-openssl
 endif
 
-define Build/Compile
-	$(MAKE) -C $(PKG_BUILD_DIR) \
-	MAKE_FLAGS = \
+MAKE_FLAGS = \
 		CC="$(TARGET_CC)" \
 		DESTDIR="$(PKG_INSTALL_DIR)" \
 		HOST_CPU="$(PKGARCH)" \
 		LDFLAGS="-Wl,--gc-sections" 
-
-endef
 
 define Package/opkg/Default/install
 	$(INSTALL_DIR) $(1)/usr/lib/opkg

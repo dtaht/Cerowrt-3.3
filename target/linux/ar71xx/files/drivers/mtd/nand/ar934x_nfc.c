@@ -131,6 +131,7 @@
 #define AR934X_NFC_DEV_READY_TIMEOUT	25 /* msecs */
 #define AR934X_NFC_DMA_READY_TIMEOUT	25 /* msecs */
 #define AR934X_NFC_DONE_TIMEOUT		1000
+#define AR934X_NFC_DMA_RETRIES		20
 
 #define AR934X_NFC_USE_IRQ		true
 #define AR934X_NFC_IRQ_MASK		AR934X_NFC_INT_DEV_RDY(0)
@@ -465,7 +466,7 @@ retry:
 			(write) ? "write" : "read", page_addr);
 
 		ar934x_nfc_restart(nfc);
-		if (retries++ < 5)
+		if (retries++ < AR934X_NFC_DMA_RETRIES)
 			goto retry;
 
 		dev_err(nfc->parent, "%s operation failed on page %d\n",
@@ -491,12 +492,12 @@ ar934x_nfc_send_readid(struct ar934x_nfc *nfc, unsigned command)
 
 static void
 ar934x_nfc_send_read(struct ar934x_nfc *nfc, unsigned command, int column,
-		     int page_addr, int len, bool oob)
+		     int page_addr, int len)
 {
 	u32 cmd_reg;
 
-	nfc_dbg(nfc, "read, column=%d page=%d len=%d oob:%d\n",
-		column, page_addr, len, oob);
+	nfc_dbg(nfc, "read, column=%d page=%d len=%d\n",
+		column, page_addr, len);
 
 	cmd_reg = (command & AR934X_NFC_CMD_CMD0_M) << AR934X_NFC_CMD_CMD0_S;
 
@@ -613,37 +614,38 @@ ar934x_nfc_cmdfunc(struct mtd_info *mtd, unsigned int command, int column,
 
 	case NAND_CMD_READ0:
 	case NAND_CMD_READ1:
-		if (nfc->small_page)
-			ar934x_nfc_send_read(nfc, command, column, page_addr,
-					     mtd->writesize + mtd->oobsize,
-					     false);
-		else
-			ar934x_nfc_send_read(nfc, command, column, page_addr,
-					     mtd->writesize, false);
-		nfc->rndout_page_addr = page_addr;
-		nfc->rndout_read_cmd = command;
-		break;
-
-	case NAND_CMD_READOOB:
 		if (nfc->small_page) {
-			ar934x_nfc_send_read(nfc, NAND_CMD_READOOB,
-					     column, page_addr,
-					     mtd->oobsize,
-					     true);
+			ar934x_nfc_send_read(nfc, command, column, page_addr,
+					     mtd->writesize + mtd->oobsize);
 		} else {
-			ar934x_nfc_send_read(nfc, NAND_CMD_READ0,
-					     column, page_addr,
-					     mtd->writesize + mtd->oobsize,
-					     true);
-			nfc->buf_index = mtd->writesize;
+			ar934x_nfc_send_read(nfc, command, 0, page_addr,
+					     mtd->writesize + mtd->oobsize);
+			nfc->buf_index = column;
+			nfc->rndout_page_addr = page_addr;
+			nfc->rndout_read_cmd = command;
 		}
 		break;
 
+	case NAND_CMD_READOOB:
+		if (nfc->small_page)
+			ar934x_nfc_send_read(nfc, NAND_CMD_READOOB,
+					     column, page_addr,
+					     mtd->oobsize);
+		else
+			ar934x_nfc_send_read(nfc, NAND_CMD_READ0,
+					     mtd->writesize, page_addr,
+					     mtd->oobsize);
+		break;
+
 	case NAND_CMD_RNDOUT:
+		if (WARN_ON(nfc->small_page))
+			break;
+
 		/* emulate subpage read */
-		ar934x_nfc_send_read(nfc, nfc->rndout_read_cmd, column,
+		ar934x_nfc_send_read(nfc, nfc->rndout_read_cmd, 0,
 				     nfc->rndout_page_addr,
-				     mtd->writesize, false);
+				     mtd->writesize + mtd->oobsize);
+		nfc->buf_index = column;
 		break;
 
 	case NAND_CMD_ERASE1:

@@ -78,7 +78,7 @@ Package/opkg-curl/conffiles = $(Package/opkg/conffiles)
 define Package/opkg-gpg
   $(call Package/opkg/Default)
   TITLE+= (with GPG signing support)
-  DEPENDS+= +libgpgme @USE_GPG
+  DEPENDS+= +libgpgme
   VARIANT:=gpg
 endef
 
@@ -170,8 +170,8 @@ define Package/opkg-gpg/install
 	$(call Package/opkg/Default/install,$(1),-gpg)
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/opkg-key $(1)/bin/
 	$(INSTALL_DIR) $(1)/etc/opkg
-	gpg --export $(call qstrip,$(CONFIG_GPG_KEY)) | \
-		$(STAGING_DIR_HOST)/bin/opkg-key -o $(1) add -
+#	gpg --export $(call qstrip,$(CONFIG_GPG_KEY)) | \
+#		$(STAGING_DIR_HOST)/bin/opkg-key -o $(1) add -
 endef
 
 define Package/opkg-smime/install

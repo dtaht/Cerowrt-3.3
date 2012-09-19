@@ -20,7 +20,7 @@ index 2f9ab17..12d9363c 100644
  	struct codel_sched_data *q;
  
  	if (likely(qdisc_qlen(sch) < sch->limit)) {
-+		if(qdisc_qlen(sch) > 64)
++		if(qdisc_qlen(sch) > 128)
 +			skb = skb_reduce_truesize(skb);
  		codel_set_enqueue_time(skb);
  		return qdisc_enqueue_tail(skb, sch);
@@ -35,7 +35,7 @@ index 66effe2..2031a3e 100644
  {
 -	if (likely(skb_queue_len(&sch->q) < sch->limit))
 +	if (likely(skb_queue_len(&sch->q) < sch->limit)) {
-+		if (skb_queue_len(&sch->q) > 64)
++		if (skb_queue_len(&sch->q) > 128)
 +			skb = skb_reduce_truesize(skb);
  		return qdisc_enqueue_tail(skb, sch);
 -
@@ -47,7 +47,7 @@ index 66effe2..2031a3e 100644
  {
 -	if (likely(skb_queue_len(&sch->q) < sch->limit))
 +	if (likely(skb_queue_len(&sch->q) < sch->limit)) {
-+		if (skb_queue_len(&sch->q) > 64)
++		if (skb_queue_len(&sch->q) > 128)
 +			skb = skb_reduce_truesize(skb);
  		return qdisc_enqueue_tail(skb, sch);
 -
@@ -63,7 +63,7 @@ index ba944bd..136d2bc 100644
  		return ret;
  	}
  	idx--;
-+	if (sch->q.qlen > 64)
++	if (sch->q.qlen > 128)
 +		skb = skb_reduce_truesize(skb);
  
  	codel_set_enqueue_time(skb);

@@ -22,7 +22,7 @@ index 333beb6..3480d73 100644
 -//	idx = --idx + bk * q->something;
  	--idx;
 -
-+	if (sch->q.qlen > 64)
++	if (sch->q.qlen > 128)
 +                skb = skb_reduce_truesize(skb);
  	now = codel_set_enqueue_time(skb);
  	flow = &q->flows[idx];
@@ -65,7 +65,7 @@ index 105f353..3aea143 100644
  	}
  	idx--;
 -
-+	if (sch->q.qlen > 64)
++	if (sch->q.qlen > 128)
 +		skb = skb_reduce_truesize(skb);
  	codel_set_enqueue_time(skb);
  	flow = &q->flows[idx];
@@ -80,7 +80,7 @@ index c8d930d..38b7781 100644
  	struct codel_sched_data *q;
 -
  	if (likely(qdisc_qlen(sch) < sch->limit)) {
-+		if(qdisc_qlen(sch) > 64)
++		if(qdisc_qlen(sch) > 128)
 +			skb = skb_reduce_truesize(skb);
  		codel_set_enqueue_time(skb);
  		return qdisc_enqueue_tail(skb, sch);
